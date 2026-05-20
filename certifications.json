@@ -25,6 +25,15 @@
       "description": "Esto es un texto de prueba que habla acerca de la certificacion que hice de google para ver si esta bien y funciona todo como corresponde",
       "link": "google.com",
       "image": "images/cert_mpe7pr4ep1v0.jpg"
+    },
+    {
+      "id": "mpe89j831fxh",
+      "title": "Certificate of Completion: Al Fluency Framework & Foundations",
+      "institution": "Anthropic",
+      "date": "2026-05",
+      "description": "ID de credencial: r2qe74h973oh",
+      "link": "https://verify.skilljar.com/c/r2qe74h973oh",
+      "image": "images/cert_mpe89j831fxh.png"
     }
   ]
 }
