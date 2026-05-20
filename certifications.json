@@ -1,18 +1,6 @@
 {
   "certifications": [
     {
-      "id": "mpe7pr4ep1v0",
-      "title": "Google Ads",
-      "institution": "Google",
-      "date": "2026-06",
-      "description": "Esto es un texto de prueba que habla acerca de la certificacion que hice de google para ver si esta bien y funciona todo como corresponde",
-      "link": "google.com",
-      "images": [
-        "images/cert_mpe7pr4ep1v0.jpg",
-        "images/cert_mpe7pr4ep1v0_1779304024431_0.png"
-      ]
-    },
-    {
       "id": "mpe89j831fxh",
       "title": "Certificate of Completion: Al Fluency Framework & Foundations",
       "institution": "Anthropic",
