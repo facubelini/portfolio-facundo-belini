@@ -25,16 +25,18 @@ const GH_API         = 'https://api.github.com';
 
 /* ─── Estado ─────────────────────────────────────────────────────── */
 const state = {
-  projects:       [],
-  certifications: [],
-  services:       [],
-  tools:          [],
-  about:          { bio: '', role: '' },
-  contact:        { linkedin: '', whatsapp: '', email: '' },
-  hero:           { line1: 'Trabajo', line2: 'seleccionado.', sub: 'Diseño y desarrollo.' },
-  activeFilter:   'Todos',
-  failedAttempts: 0,
-  lockoutUntil:   null,
+  projects:         [],
+  certifications:   [],
+  services:         [],
+  tools:            [],
+  about:            { bio: '', role: '' },
+  contact:          { linkedin: '', whatsapp: '', email: '' },
+  hero:             { line1: 'Trabajo', line2: 'seleccionado.', sub: 'Diseño y desarrollo.' },
+  layout:           { projectCols: 3, certCols: 4 },
+  activeFilter:     'Todos',
+  activeCertFilter: 'Todos',
+  failedAttempts:   0,
+  lockoutUntil:     null,
 };
 
 /* ─── Carousel state ─────────────────────────────────────────────── */
@@ -217,6 +219,38 @@ async function loadHero() {
   } catch { state.hero = { line1: 'Trabajo', line2: 'seleccionado.', sub: 'Diseño y desarrollo.' }; }
 }
 
+async function loadLayout() {
+  try {
+    const res = await fetch(`./layout.json?t=${Date.now()}`);
+    if (!res.ok) throw new Error();
+    const d = await res.json();
+    state.layout = {
+      projectCols: d.projectCols || 3,
+      certCols:    d.certCols    || 4,
+    };
+  } catch { state.layout = { projectCols: 3, certCols: 4 }; }
+}
+
+function applyLayout() {
+  const r = document.documentElement;
+  r.style.setProperty('--cols-projects', state.layout.projectCols);
+  r.style.setProperty('--cols-certs',    state.layout.certCols);
+}
+
+async function saveLayout() {
+  const cfg = getGHConfig(); if (!cfg) return;
+  try {
+    const existing = await ghGetFile('layout.json', cfg);
+    await ghPutTextFile(
+      'layout.json',
+      JSON.stringify(state.layout, null, 2),
+      existing?.sha || null,
+      'Update layout config',
+      cfg
+    );
+  } catch { /* silently ignore */ }
+}
+
 /* ════════════════════════════════════════════════════════════════════
    RENDER — HERO
    ════════════════════════════════════════════════════════════════════ */
@@ -245,6 +279,7 @@ function renderHero() {
    ════════════════════════════════════════════════════════════════════ */
 
 function renderAll() {
+  applyLayout();
   renderCategories();
   renderProjects(state.activeFilter);
   updateCounter();
@@ -253,16 +288,31 @@ function renderAll() {
 function renderCategories() {
   const container  = document.getElementById('filters-container');
   const categories = ['Todos', ...new Set(state.projects.map(p => p.category).filter(Boolean))];
+  const colPickerHTML = isEditorActive()
+    ? `<div class="col-picker" title="Columnas de proyectos por fila">
+         <span class="col-picker-label">Col:</span>
+         ${[1, 2, 3, 4].map(n =>
+           `<button class="col-pick-btn${n === state.layout.projectCols ? ' active' : ''}" data-cols="${n}">${n}</button>`
+         ).join('')}
+       </div>` : '';
   container.innerHTML = categories.map(cat => `
     <button class="filter-btn${cat === state.activeFilter ? ' active' : ''}" data-cat="${escHtml(cat)}">
       ${escHtml(cat)}
     </button>
-  `).join('');
+  `).join('') + colPickerHTML;
   container.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       state.activeFilter = btn.dataset.cat;
       container.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b === btn));
       renderProjects(state.activeFilter);
+    });
+  });
+  container.querySelectorAll('.col-pick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.layout.projectCols = parseInt(btn.dataset.cols, 10);
+      applyLayout();
+      saveLayout();
+      container.querySelectorAll('.col-pick-btn').forEach(b => b.classList.toggle('active', b === btn));
     });
   });
 }
@@ -393,18 +443,60 @@ function renderCertifications() {
          Agregar
        </button>` : '';
 
-  const cardsHTML = certifications.length > 0
-    ? `<div class="certs-grid">${certifications.map((c, i) => buildCertCardHTML(c, i)).join('')}</div>`
-    : `<div class="certs-empty">No hay certificaciones todavía.</div>`;
+  // Categorías únicas de certs
+  const certCats = ['Todos', ...new Set(certifications.map(c => c.category).filter(Boolean))];
+  const hasCats  = certCats.length > 1;
+
+  const certFilterHTML = (hasCats || isEditorActive())
+    ? `<div class="cert-filters" id="cert-filters-container">
+         ${hasCats ? certCats.map(cat =>
+             `<button class="filter-btn cert-filter-btn${cat === state.activeCertFilter ? ' active' : ''}" data-cat="${escHtml(cat)}">${escHtml(cat)}</button>`
+           ).join('') : ''}
+         ${isEditorActive()
+           ? `<div class="col-picker" title="Columnas de certificaciones por fila">
+                <span class="col-picker-label">Col:</span>
+                ${[2, 3, 4, 5].map(n =>
+                    `<button class="col-pick-btn${n === state.layout.certCols ? ' active' : ''}" data-cols="${n}">${n}</button>`
+                  ).join('')}
+              </div>` : ''}
+       </div>` : '';
+
+  // Filtrar certs
+  const filtered = state.activeCertFilter === 'Todos'
+    ? certifications
+    : certifications.filter(c => c.category === state.activeCertFilter);
+
+  const cardsHTML = filtered.length > 0
+    ? `<div class="certs-grid">${filtered.map((c, i) => buildCertCardHTML(c, i)).join('')}</div>`
+    : `<div class="certs-empty">${certifications.length === 0 ? 'No hay certificaciones todavía.' : 'No hay certificaciones en esta categoría.'}</div>`;
 
   section.innerHTML = `
     <div class="section-header">
       <h2 class="section-title">Certificaciones <em>&</em> cursos</h2>
       ${addBtn}
     </div>
+    ${certFilterHTML}
     ${cardsHTML}`;
 
   document.getElementById('add-cert-btn')?.addEventListener('click', () => showCertFormModal(null));
+
+  // Cert filter buttons
+  section.querySelectorAll('.cert-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.activeCertFilter = btn.dataset.cat;
+      renderCertifications();
+    });
+  });
+
+  // Col picker para certs
+  section.querySelectorAll('.col-pick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.layout.certCols = parseInt(btn.dataset.cols, 10);
+      applyLayout();
+      saveLayout();
+      section.querySelectorAll('.col-pick-btn').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
 
   if (isEditorActive()) {
     section.querySelectorAll('.cert-delete-btn').forEach(btn => {
@@ -441,15 +533,19 @@ function buildCertCardHTML(cert, idx) {
   const linkEl = cert.link
     ? `<a class="cert-link" href="${escHtml(cert.link)}" target="_blank" rel="noopener noreferrer">Ver certificado</a>` : '';
 
+  const catEl = cert.category ? `<span class="cert-category">${escHtml(cert.category)}</span>` : '';
   return `
     <div class="cert-card" data-id="${id}" style="--card-i:${idx}">
       ${editBtn}${delBtn}
       ${imgEl}
-      <p class="cert-institution">${escHtml(cert.institution || '')}</p>
-      <h3 class="cert-title">${escHtml(cert.title)}</h3>
-      ${cert.date ? `<time class="cert-date" datetime="${escHtml(cert.date)}">${formatDate(cert.date)}</time>` : ''}
-      ${cert.description ? `<p class="cert-desc">${escHtml(cert.description)}</p>` : ''}
-      ${linkEl}
+      <div class="cert-body">
+        ${catEl}
+        <p class="cert-institution">${escHtml(cert.institution || '')}</p>
+        <h3 class="cert-title">${escHtml(cert.title)}</h3>
+        ${cert.date ? `<time class="cert-date" datetime="${escHtml(cert.date)}">${formatDate(cert.date)}</time>` : ''}
+        ${cert.description ? `<p class="cert-desc">${escHtml(cert.description)}</p>` : ''}
+        ${linkEl}
+      </div>
     </div>`.trim();
 }
 
@@ -937,7 +1033,7 @@ function activateEditorMode() {
     document.getElementById('editor-exit-btn').addEventListener('click', deactivateEditorMode);
   }
   renderHero();
-  renderProjects(state.activeFilter);
+  renderAll();
   renderAbout();
   renderServices();
   renderTools();
@@ -949,7 +1045,7 @@ function deactivateEditorMode() {
   clearSession();
   document.getElementById('editor-indicator')?.remove();
   renderHero();
-  renderProjects(state.activeFilter);
+  renderAll();
   renderAbout();
   renderServices();
   renderTools();
@@ -1215,6 +1311,10 @@ function showCertFormModal(existingCert) {
       <label class="form-label" for="cf-title">Título <span class="req">*</span></label>
       <input id="cf-title" type="text" class="form-input" placeholder="Nombre del curso o certificación" value="${escHtml(c.title || '')}" />
     </div>
+    <div class="form-group">
+      <label class="form-label" for="cf-cat">Categoría <span class="hint">(opcional — sirve para filtrar)</span></label>
+      <input id="cf-cat" type="text" class="form-input" placeholder="Diseño, Desarrollo, Marketing…" value="${escHtml(c.category || '')}" />
+    </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label" for="cf-inst">Institución / Plataforma <span class="req">*</span></label>
@@ -1280,6 +1380,7 @@ function showCertEditModal(certId) {
 async function submitNewCert() {
   if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
   const title    = document.getElementById('cf-title').value.trim();
+  const category = document.getElementById('cf-cat').value.trim();
   const inst     = document.getElementById('cf-inst').value.trim();
   const date     = document.getElementById('cf-date').value;
   const desc     = document.getElementById('cf-desc').value.trim();
@@ -1301,7 +1402,7 @@ async function submitNewCert() {
 
   const cert = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    title, institution: inst, date: date || null,
+    title, category: category || null, institution: inst, date: date || null,
     description: desc, link: link || null, images: [],
   };
 
@@ -1335,6 +1436,7 @@ async function submitNewCert() {
 async function submitCertEdit(certId, originalImages) {
   if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
   const title    = document.getElementById('cf-title').value.trim();
+  const category = document.getElementById('cf-cat').value.trim();
   const inst     = document.getElementById('cf-inst').value.trim();
   const date     = document.getElementById('cf-date').value;
   const desc     = document.getElementById('cf-desc').value.trim();
@@ -1386,7 +1488,7 @@ async function submitCertEdit(certId, originalImages) {
 
     const updated = {
       ...data.certifications[idx],
-      title, institution: inst, date: date || null,
+      title, category: category || null, institution: inst, date: date || null,
       description: desc, link: link || null, images: newImages,
     };
     delete updated.image;
@@ -2085,10 +2187,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const yr = new Date().getFullYear();
   document.querySelectorAll('#current-year, #footer-year').forEach(el => { el.textContent = yr; });
 
-  await Promise.all([loadProjects(), loadAbout(), loadCertifications(), loadContact(), loadHero(), loadServices(), loadTools()]);
+  await Promise.all([loadProjects(), loadAbout(), loadCertifications(), loadContact(), loadHero(), loadServices(), loadTools(), loadLayout()]);
 
   renderHero();
   renderAll();
+  applyLayout();
   renderAbout();
   renderServices();
   renderTools();
