@@ -1,17 +1,16 @@
 /* ================================================================
    PORTFOLIO — app.js
-
    Modelo de seguridad:
    ─ Palabra clave  → verificada por sesión (sessionStorage)
    ─ PAT            → localStorage, ingresado una sola vez
-   ─ owner/repo/branch → hardcodeados aquí (son públicos de todas formas)
+   ─ owner/repo/branch → hardcodeados (el repo es público de todas formas)
    ─ DOM de edición → inyectado SOLO después de verificación
    ─ Write API      → doble-check isEditorActive() antes de cada fetch
    ================================================================ */
 
 'use strict';
 
-/* ─── Config del repositorio (no sensible — el repo es público) ── */
+/* ─── Config del repositorio ─────────────────────────────────────── */
 const GH_OWNER  = 'facubelini';
 const GH_REPO   = 'portfolio-facundo-belini';
 const GH_BRANCH = 'main';
@@ -24,16 +23,18 @@ const GH_PAT_KEY     = 'pflio_pat';
 const EDITOR_SES_KEY = 'pflio_editor_active';
 const GH_API         = 'https://api.github.com';
 
-/* ─── Estado en memoria ──────────────────────────────────────────── */
+/* ─── Estado ─────────────────────────────────────────────────────── */
 const state = {
   projects:       [],
+  certifications: [],
+  about:          { bio: '', role: '' },
   activeFilter:   'Todos',
   failedAttempts: 0,
   lockoutUntil:   null,
 };
 
 /* ════════════════════════════════════════════════════════════════════
-   SESIÓN Y CONFIGURACIÓN
+   SESIÓN Y CONFIG
    ════════════════════════════════════════════════════════════════════ */
 
 const isEditorActive  = () => sessionStorage.getItem(EDITOR_SES_KEY) === 'true';
@@ -45,9 +46,7 @@ function getGHConfig() {
   if (!pat) return null;
   return { owner: GH_OWNER, repo: GH_REPO, branch: GH_BRANCH, pat };
 }
-function savePAT(pat) {
-  localStorage.setItem(GH_PAT_KEY, pat);
-}
+function savePAT(pat) { localStorage.setItem(GH_PAT_KEY, pat); }
 
 function lockoutRemaining() {
   if (!state.lockoutUntil) return 0;
@@ -74,10 +73,7 @@ async function ghGetFile(path, cfg) {
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`GitHub ${res.status}: ${res.statusText}`);
   const data = await res.json();
-  return {
-    sha:     data.sha,
-    content: atob(data.content.replace(/\n/g, '')),
-  };
+  return { sha: data.sha, content: atob(data.content.replace(/\n/g, '')) };
 }
 
 async function ghPutTextFile(path, text, sha, msg, cfg) {
@@ -122,19 +118,37 @@ async function ghDeleteFile(path, sha, msg, cfg) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   PROYECTOS — CARGA Y RENDER
+   CARGA DE DATOS
    ════════════════════════════════════════════════════════════════════ */
 
 async function loadProjects() {
   try {
     const res = await fetch(`./projects.json?t=${Date.now()}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    state.projects = data.projects || [];
-  } catch {
-    state.projects = [];
-  }
+    if (!res.ok) throw new Error();
+    state.projects = (await res.json()).projects || [];
+  } catch { state.projects = []; }
 }
+
+async function loadAbout() {
+  try {
+    const res = await fetch(`./about.json?t=${Date.now()}`);
+    if (!res.ok) throw new Error();
+    const d = await res.json();
+    state.about = { bio: d.bio || '', role: d.role || '' };
+  } catch { state.about = { bio: '', role: '' }; }
+}
+
+async function loadCertifications() {
+  try {
+    const res = await fetch(`./certifications.json?t=${Date.now()}`);
+    if (!res.ok) throw new Error();
+    state.certifications = (await res.json()).certifications || [];
+  } catch { state.certifications = []; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RENDER — PROYECTOS
+   ════════════════════════════════════════════════════════════════════ */
 
 function renderAll() {
   renderCategories();
@@ -144,9 +158,7 @@ function renderAll() {
 
 function renderCategories() {
   const container  = document.getElementById('filters-container');
-  const categories = ['Todos', ...new Set(
-    state.projects.map(p => p.category).filter(Boolean)
-  )];
+  const categories = ['Todos', ...new Set(state.projects.map(p => p.category).filter(Boolean))];
   container.innerHTML = categories.map(cat => `
     <button class="filter-btn${cat === state.activeFilter ? ' active' : ''}" data-cat="${escHtml(cat)}">
       ${escHtml(cat)}
@@ -155,9 +167,7 @@ function renderCategories() {
   container.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       state.activeFilter = btn.dataset.cat;
-      container.querySelectorAll('.filter-btn').forEach(b =>
-        b.classList.toggle('active', b === btn)
-      );
+      container.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b === btn));
       renderProjects(state.activeFilter);
     });
   });
@@ -166,15 +176,9 @@ function renderCategories() {
 function renderProjects(filter) {
   const grid  = document.getElementById('projects-grid');
   const empty = document.getElementById('empty-state');
-  const list  = filter === 'Todos'
-    ? state.projects
-    : state.projects.filter(p => p.category === filter);
+  const list  = filter === 'Todos' ? state.projects : state.projects.filter(p => p.category === filter);
 
-  if (list.length === 0) {
-    grid.innerHTML = '';
-    empty.hidden   = false;
-    return;
-  }
+  if (list.length === 0) { grid.innerHTML = ''; empty.hidden = false; return; }
   empty.hidden   = true;
   grid.innerHTML = list.map((p, i) => buildCardHTML(p, i)).join('');
   if (isEditorActive()) attachDeleteHandlers();
@@ -183,24 +187,15 @@ function renderProjects(filter) {
 function buildCardHTML(project, idx) {
   const id  = escHtml(project.id || '');
   const img = project.image
-    ? `<div class="card-img-wrap">
-         <img src="./${escHtml(project.image)}" alt="${escHtml(project.title)}" class="card-img" loading="lazy" />
-       </div>`
-    : `<div class="card-img-wrap card-img-placeholder">
-         <span class="placeholder-label" aria-hidden="true">${escHtml(project.category || '—')}</span>
-       </div>`;
-
-  const tags = (project.technologies || [])
-    .map(t => `<span class="card-tag">${escHtml(t)}</span>`).join('');
-
+    ? `<div class="card-img-wrap"><img src="./${escHtml(project.image)}" alt="${escHtml(project.title)}" class="card-img" loading="lazy" /></div>`
+    : `<div class="card-img-wrap card-img-placeholder"><span class="placeholder-label" aria-hidden="true">${escHtml(project.category || '—')}</span></div>`;
+  const tags   = (project.technologies || []).map(t => `<span class="card-tag">${escHtml(t)}</span>`).join('');
   const delBtn = isEditorActive()
-    ? `<button class="card-delete-btn" data-id="${id}" aria-label="Eliminar" title="Eliminar proyecto">×</button>`
-    : '';
+    ? `<button class="card-delete-btn" data-id="${id}" aria-label="Eliminar" title="Eliminar">×</button>` : '';
 
   return `
     <article class="project-card" data-id="${id}" style="--card-i:${idx}">
-      ${delBtn}
-      ${img}
+      ${delBtn}${img}
       <div class="card-body">
         <span class="card-category">${escHtml(project.category || '')}</span>
         <h2 class="card-title">${escHtml(project.title)}</h2>
@@ -208,8 +203,7 @@ function buildCardHTML(project, idx) {
         <p class="card-desc">${escHtml(project.description || '')}</p>
         ${tags ? `<div class="card-tags">${tags}</div>` : ''}
       </div>
-    </article>
-  `.trim();
+    </article>`.trim();
 }
 
 function attachDeleteHandlers() {
@@ -230,19 +224,119 @@ function showDeleteConfirm(projectId, cardEl) {
     <div class="confirm-btns">
       <button class="btn btn-danger confirm-yes">Sí, eliminar</button>
       <button class="btn btn-ghost confirm-no">Cancelar</button>
-    </div>
-  `;
+    </div>`;
   cardEl.appendChild(overlay);
   overlay.querySelector('.confirm-no').addEventListener('click',  () => overlay.remove());
-  overlay.querySelector('.confirm-yes').addEventListener('click', () => {
-    overlay.remove();
-    deleteProject(projectId);
-  });
+  overlay.querySelector('.confirm-yes').addEventListener('click', () => { overlay.remove(); deleteProject(projectId); });
 }
 
 function updateCounter() {
   const el = document.getElementById('project-count');
   if (el) el.textContent = state.projects.length;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RENDER — ABOUT ME
+   ════════════════════════════════════════════════════════════════════ */
+
+function renderAbout() {
+  const section = document.getElementById('about-section');
+  if (!section) return;
+  const { bio, role } = state.about;
+
+  if (!bio && !isEditorActive()) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  const editBtn = isEditorActive()
+    ? `<button class="about-edit-btn" id="about-edit-btn">Editar</button>` : '';
+
+  const bioHTML = bio
+    ? `<p class="about-bio">${escHtml(bio).replace(/\n/g, '<br>')}</p>
+       ${role ? `<p class="about-role">${escHtml(role)}</p>` : ''}`
+    : `<p class="about-bio" style="color:var(--fg-faint);font-style:italic;">Hacé clic en "Editar" para escribir tu bio.</p>`;
+
+  section.innerHTML = `
+    <span class="about-label">Sobre mí</span>
+    <div class="about-body">${editBtn}${bioHTML}</div>`;
+
+  document.getElementById('about-edit-btn')?.addEventListener('click', showAboutEditModal);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RENDER — CERTIFICACIONES
+   ════════════════════════════════════════════════════════════════════ */
+
+function renderCertifications() {
+  const section = document.getElementById('certs-section');
+  if (!section) return;
+  const { certifications } = state;
+
+  if (certifications.length === 0 && !isEditorActive()) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  const addBtn = isEditorActive()
+    ? `<button class="add-cert-btn" id="add-cert-btn">
+         <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+           <line x1="5.5" y1="1" x2="5.5" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+           <line x1="1" y1="5.5" x2="10" y2="5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+         </svg>
+         Agregar
+       </button>` : '';
+
+  const cardsHTML = certifications.length > 0
+    ? `<div class="certs-grid">${certifications.map((c, i) => buildCertCardHTML(c, i)).join('')}</div>`
+    : `<div class="certs-empty">No hay certificaciones todavía.</div>`;
+
+  section.innerHTML = `
+    <div class="section-header">
+      <h2 class="section-title">Certificaciones <em>&</em> cursos</h2>
+      ${addBtn}
+    </div>
+    ${cardsHTML}`;
+
+  document.getElementById('add-cert-btn')?.addEventListener('click', showCertFormModal);
+
+  if (isEditorActive()) {
+    section.querySelectorAll('.cert-delete-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        showCertDeleteConfirm(btn.dataset.id, btn.closest('.cert-card'));
+      });
+    });
+  }
+}
+
+function buildCertCardHTML(cert, idx) {
+  const id     = escHtml(cert.id || '');
+  const delBtn = isEditorActive()
+    ? `<button class="cert-delete-btn" data-id="${id}" aria-label="Eliminar" title="Eliminar">×</button>` : '';
+  const linkEl = cert.link
+    ? `<a class="cert-link" href="${escHtml(cert.link)}" target="_blank" rel="noopener noreferrer">Ver certificado</a>` : '';
+
+  return `
+    <div class="cert-card" data-id="${id}" style="--card-i:${idx}">
+      ${delBtn}
+      <p class="cert-institution">${escHtml(cert.institution || '')}</p>
+      <h3 class="cert-title">${escHtml(cert.title)}</h3>
+      ${cert.date ? `<time class="cert-date" datetime="${escHtml(cert.date)}">${formatDate(cert.date)}</time>` : ''}
+      ${cert.description ? `<p class="cert-desc">${escHtml(cert.description)}</p>` : ''}
+      ${linkEl}
+    </div>`.trim();
+}
+
+function showCertDeleteConfirm(certId, cardEl) {
+  cardEl.querySelector('.card-confirm-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'card-confirm-overlay';
+  overlay.innerHTML = `
+    <p class="confirm-msg">¿Eliminar esta certificación?</p>
+    <div class="confirm-btns">
+      <button class="btn btn-danger confirm-yes">Sí, eliminar</button>
+      <button class="btn btn-ghost confirm-no">Cancelar</button>
+    </div>`;
+  cardEl.appendChild(overlay);
+  overlay.querySelector('.confirm-no').addEventListener('click',  () => overlay.remove());
+  overlay.querySelector('.confirm-yes').addEventListener('click', () => { overlay.remove(); deleteCert(certId); });
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -280,17 +374,10 @@ function showKeywordModal() {
         <h3 class="modal-title">Acceso bloqueado</h3>
         <button class="modal-close" onclick="hideModal()">×</button>
       </div>
-      <p class="modal-msg modal-msg--error">
-        Demasiados intentos fallidos.<br>
-        Intentá de nuevo en ${mins} minuto${mins !== 1 ? 's' : ''}.
-      </p>
-      <div class="modal-actions">
-        <button class="btn btn-ghost" onclick="hideModal()">Cerrar</button>
-      </div>
-    `);
+      <p class="modal-msg modal-msg--error">Demasiados intentos. Intentá en ${mins} minuto${mins !== 1 ? 's' : ''}.</p>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="hideModal()">Cerrar</button></div>`);
     return;
   }
-
   showModal(`
     <div class="modal-header">
       <h3 class="modal-title">Modo editor</h3>
@@ -299,23 +386,20 @@ function showKeywordModal() {
     <p class="modal-sub">Ingresá la palabra clave para continuar.</p>
     <div class="form-group">
       <label class="form-label" for="kw-input">Palabra clave</label>
-      <input id="kw-input" type="password" class="form-input"
-             autocomplete="off" autocorrect="off" autocapitalize="off"
-             placeholder="••••••••••••" />
+      <input id="kw-input" type="password" class="form-input" autocomplete="off" placeholder="••••••••••••" />
     </div>
     <div id="kw-error" class="form-error" hidden></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
       <button class="btn btn-primary" id="kw-btn">Continuar →</button>
-    </div>
-  `);
+    </div>`);
 
   const input = document.getElementById('kw-input');
   const errEl = document.getElementById('kw-error');
   const btn   = document.getElementById('kw-btn');
-  const submit = () => handleKeywordSubmit(input.value, errEl, btn, input);
-  btn.addEventListener('click', submit);
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  const go    = () => handleKeywordSubmit(input.value, errEl, btn, input);
+  btn.addEventListener('click', go);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
 }
 
 function handleKeywordSubmit(value, errEl, btn, input) {
@@ -325,28 +409,25 @@ function handleKeywordSubmit(value, errEl, btn, input) {
     activateEditorMode();
     hideModal();
     setTimeout(() => {
-      const pat = localStorage.getItem(GH_PAT_KEY);
-      if (!pat) showTokenModal();
-      else      showProjectFormModal();
+      if (!localStorage.getItem(GH_PAT_KEY)) showTokenModal();
+      else showProjectFormModal();
     }, 260);
     return;
   }
-
   state.failedAttempts++;
   if (state.failedAttempts >= MAX_ATTEMPTS) {
     state.lockoutUntil = Date.now() + LOCKOUT_MS;
-    showError(errEl, `Acceso bloqueado por ${LOCKOUT_MS / 60000} minutos.`);
+    showError(errEl, `Bloqueado por ${LOCKOUT_MS / 60000} minutos.`);
     btn.disabled = true;
     return;
   }
-
   const left = MAX_ATTEMPTS - state.failedAttempts;
-  showError(errEl, `Palabra clave incorrecta. ${left} intento${left !== 1 ? 's' : ''} restante${left !== 1 ? 's' : ''}.`);
+  showError(errEl, `Incorrecta. ${left} intento${left !== 1 ? 's' : ''} restante${left !== 1 ? 's' : ''}.`);
   if (input) { input.value = ''; input.focus(); }
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   MODAL DE TOKEN (primera vez)
+   MODAL TOKEN (primera vez)
    ════════════════════════════════════════════════════════════════════ */
 
 function showTokenModal() {
@@ -355,27 +436,19 @@ function showTokenModal() {
       <h3 class="modal-title">Token de GitHub</h3>
       <button class="modal-close" onclick="hideModal()">×</button>
     </div>
-    <p class="modal-sub">
-      Solo necesitás ingresarlo una vez — se guarda en tu navegador.<br>
-      Necesitás un <strong>fine-grained PAT</strong> con acceso a
-      <code style="font-size:0.8em;background:var(--bg-alt);padding:0.1em 0.4em;">portfolio-facundo-belini</code>
-      y permiso <strong>Contents: Read and write</strong>.
-    </p>
+    <p class="modal-sub">Solo necesitás ingresarlo una vez — se guarda en tu navegador.</p>
     <div class="form-group">
       <label class="form-label" for="tok-input">Personal Access Token <span class="req">*</span></label>
-      <input id="tok-input" type="password" class="form-input"
-             placeholder="github_pat_..." autocomplete="off" spellcheck="false" />
+      <input id="tok-input" type="password" class="form-input" placeholder="github_pat_..." autocomplete="off" />
     </div>
     <div id="tok-error" class="form-error" hidden></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
-      <button class="btn btn-primary" id="tok-save-btn">Guardar →</button>
-    </div>
-  `);
-
+      <button class="btn btn-primary" id="tok-save">Guardar →</button>
+    </div>`);
   const input = document.getElementById('tok-input');
   const errEl = document.getElementById('tok-error');
-  const btn   = document.getElementById('tok-save-btn');
+  const btn   = document.getElementById('tok-save');
   const save  = () => {
     const pat = input.value.trim();
     if (!pat) { showError(errEl, 'Ingresá el token.'); return; }
@@ -388,35 +461,37 @@ function showTokenModal() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   MODO EDITOR — ACTIVAR / DESACTIVAR
+   MODO EDITOR
    ════════════════════════════════════════════════════════════════════ */
 
 function activateEditorMode() {
-  if (document.getElementById('editor-indicator')) return;
-  const header = document.querySelector('.site-header');
-  const ind    = document.createElement('div');
-  ind.id        = 'editor-indicator';
-  ind.className = 'editor-indicator';
-  ind.innerHTML = `
-    <span class="editor-dot" aria-hidden="true"></span>
-    <span class="editor-label">Modo editor</span>
-    <button class="editor-exit-btn" id="editor-exit-btn">Salir</button>
-  `;
-  const right = header.querySelector('.header-right');
-  if (right) right.prepend(ind);
-  else header.appendChild(ind);
-  document.getElementById('editor-exit-btn').addEventListener('click', deactivateEditorMode);
+  if (!document.getElementById('editor-indicator')) {
+    const header = document.querySelector('.site-header');
+    const ind    = document.createElement('div');
+    ind.id = 'editor-indicator'; ind.className = 'editor-indicator';
+    ind.innerHTML = `
+      <span class="editor-dot" aria-hidden="true"></span>
+      <span class="editor-label">Modo editor</span>
+      <button class="editor-exit-btn" id="editor-exit-btn">Salir</button>`;
+    const right = header.querySelector('.header-right');
+    if (right) right.prepend(ind); else header.appendChild(ind);
+    document.getElementById('editor-exit-btn').addEventListener('click', deactivateEditorMode);
+  }
   renderProjects(state.activeFilter);
+  renderAbout();
+  renderCertifications();
 }
 
 function deactivateEditorMode() {
   clearSession();
   document.getElementById('editor-indicator')?.remove();
   renderProjects(state.activeFilter);
+  renderAbout();
+  renderCertifications();
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   MODAL DE NUEVO PROYECTO
+   MODAL NUEVO PROYECTO
    ════════════════════════════════════════════════════════════════════ */
 
 function showProjectFormModal() {
@@ -445,10 +520,7 @@ function showProjectFormModal() {
       <textarea id="pf-desc" class="form-textarea" placeholder="Descripción breve…"></textarea>
     </div>
     <div class="form-group">
-      <label class="form-label" for="pf-tech">
-        Tecnologías / medios
-        <span class="hint">(separados por coma)</span>
-      </label>
+      <label class="form-label" for="pf-tech">Tecnologías / medios <span class="hint">(separados por coma)</span></label>
       <input id="pf-tech" type="text" class="form-input" placeholder="HTML, CSS, Figma" />
     </div>
     <div class="form-group">
@@ -463,12 +535,10 @@ function showProjectFormModal() {
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
       <button class="btn btn-primary" id="pf-submit">Publicar →</button>
-    </div>
-  `);
+    </div>`);
 
   document.getElementById('pf-img').addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
       document.getElementById('img-preview').src = ev.target.result;
@@ -476,13 +546,11 @@ function showProjectFormModal() {
     };
     reader.readAsDataURL(file);
   });
-
   document.getElementById('pf-submit').addEventListener('click', submitNewProject);
 }
 
 async function submitNewProject() {
   if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
-
   const title    = document.getElementById('pf-title').value.trim();
   const category = document.getElementById('pf-cat').value.trim();
   const date     = document.getElementById('pf-date').value;
@@ -493,29 +561,21 @@ async function submitNewProject() {
   const statusEl = document.getElementById('pf-status');
   const submitBtn= document.getElementById('pf-submit');
 
-  if (!title || !category) {
-    showError(errEl, 'Título y categoría son obligatorios.'); return;
-  }
+  if (!title || !category) { showError(errEl, 'Título y categoría son obligatorios.'); return; }
   const cfg = getGHConfig();
   if (!cfg) { hideModal(); showTokenModal(); return; }
 
-  submitBtn.disabled = true;
-  errEl.hidden = true;
-
+  submitBtn.disabled = true; errEl.hidden = true;
   const setStatus = (msg, type = 'loading') => {
-    statusEl.className  = `upload-status upload-status--${type}`;
-    statusEl.textContent = msg;
-    statusEl.hidden      = false;
+    statusEl.className = `upload-status upload-status--${type}`;
+    statusEl.textContent = msg; statusEl.hidden = false;
   };
 
   const project = {
-    id:           Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    title,
-    category,
-    date:         date || null,
-    description:  desc,
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    title, category, date: date || null, description: desc,
     technologies: tech ? tech.split(',').map(t => t.trim()).filter(Boolean) : [],
-    image:        null,
+    image: null,
   };
 
   try {
@@ -527,31 +587,17 @@ async function submitNewProject() {
       await ghPutBinaryFile(fname, base64, null, `Add image: ${title}`, cfg);
       project.image = fname;
     }
-
     setStatus('Guardando proyecto…');
     const existing = await ghGetFile('projects.json', cfg);
-    let sha = null;
-    let data = { projects: [] };
-    if (existing) {
-      sha  = existing.sha;
-      data = JSON.parse(existing.content);
-    }
+    let sha = null; let data = { projects: [] };
+    if (existing) { sha = existing.sha; data = JSON.parse(existing.content); }
     if (!Array.isArray(data.projects)) data.projects = [];
-
     data.projects.push(project);
-    await ghPutTextFile(
-      'projects.json',
-      JSON.stringify(data, null, 2),
-      sha,
-      `Add project: ${title}`,
-      cfg
-    );
-
+    await ghPutTextFile('projects.json', JSON.stringify(data, null, 2), sha, `Add project: ${title}`, cfg);
     state.projects.push(project);
     renderAll();
     setStatus('¡Proyecto publicado!', 'success');
     setTimeout(hideModal, 1800);
-
   } catch (err) {
     setStatus(`Error: ${err.message}`, 'error');
     submitBtn.disabled = false;
@@ -559,45 +605,206 @@ async function submitNewProject() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   ELIMINAR PROYECTO
+   MODAL NUEVA CERTIFICACIÓN
+   ════════════════════════════════════════════════════════════════════ */
+
+function showCertFormModal() {
+  if (!isEditorActive()) { showKeywordModal(); return; }
+  showModal(`
+    <div class="modal-header">
+      <h3 class="modal-title">Nueva certificación</h3>
+      <button class="modal-close" onclick="hideModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="cf-title">Título <span class="req">*</span></label>
+      <input id="cf-title" type="text" class="form-input" placeholder="Nombre del curso o certificación" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="cf-inst">Institución / Plataforma <span class="req">*</span></label>
+        <input id="cf-inst" type="text" class="form-input" placeholder="Udemy, Coursera…" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="cf-date">Fecha</label>
+        <input id="cf-date" type="month" class="form-input" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="cf-desc">Descripción <span class="hint">(opcional)</span></label>
+      <textarea id="cf-desc" class="form-textarea" rows="3" placeholder="Breve descripción del curso…"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="cf-link">Link al certificado <span class="hint">(opcional)</span></label>
+      <input id="cf-link" type="url" class="form-input" placeholder="https://…" />
+    </div>
+    <div id="cf-status" class="upload-status" hidden></div>
+    <div id="cf-error"  class="form-error"    hidden></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
+      <button class="btn btn-primary" id="cf-submit">Publicar →</button>
+    </div>`);
+  document.getElementById('cf-submit').addEventListener('click', submitNewCert);
+}
+
+async function submitNewCert() {
+  if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
+  const title    = document.getElementById('cf-title').value.trim();
+  const inst     = document.getElementById('cf-inst').value.trim();
+  const date     = document.getElementById('cf-date').value;
+  const desc     = document.getElementById('cf-desc').value.trim();
+  const link     = document.getElementById('cf-link').value.trim();
+  const errEl    = document.getElementById('cf-error');
+  const statusEl = document.getElementById('cf-status');
+  const submitBtn= document.getElementById('cf-submit');
+
+  if (!title || !inst) { showError(errEl, 'Título e institución son obligatorios.'); return; }
+  const cfg = getGHConfig();
+  if (!cfg) { hideModal(); showTokenModal(); return; }
+
+  submitBtn.disabled = true; errEl.hidden = true;
+  const setStatus = (msg, type = 'loading') => {
+    statusEl.className = `upload-status upload-status--${type}`;
+    statusEl.textContent = msg; statusEl.hidden = false;
+  };
+
+  const cert = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    title, institution: inst, date: date || null,
+    description: desc, link: link || null,
+  };
+
+  try {
+    setStatus('Guardando…');
+    const existing = await ghGetFile('certifications.json', cfg);
+    let sha = null; let data = { certifications: [] };
+    if (existing) { sha = existing.sha; data = JSON.parse(existing.content); }
+    if (!Array.isArray(data.certifications)) data.certifications = [];
+    data.certifications.push(cert);
+    await ghPutTextFile('certifications.json', JSON.stringify(data, null, 2), sha, `Add certification: ${title}`, cfg);
+    state.certifications.push(cert);
+    renderCertifications();
+    setStatus('¡Certificación publicada!', 'success');
+    setTimeout(hideModal, 1800);
+  } catch (err) {
+    setStatus(`Error: ${err.message}`, 'error');
+    submitBtn.disabled = false;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MODAL EDITAR ABOUT
+   ════════════════════════════════════════════════════════════════════ */
+
+function showAboutEditModal() {
+  if (!isEditorActive()) return;
+  const { bio, role } = state.about;
+  showModal(`
+    <div class="modal-header">
+      <h3 class="modal-title">Sobre mí</h3>
+      <button class="modal-close" onclick="hideModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="ab-bio">Bio</label>
+      <textarea id="ab-bio" class="form-textarea" rows="6"
+                placeholder="Escribí una descripción sobre vos…">${escHtml(bio)}</textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="ab-role">
+        Rol / Especialidad
+        <span class="hint">(aparece debajo de la bio)</span>
+      </label>
+      <input id="ab-role" type="text" class="form-input"
+             value="${escHtml(role)}" placeholder="Diseño · Desarrollo" />
+    </div>
+    <div id="ab-status" class="upload-status" hidden></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
+      <button class="btn btn-primary" id="ab-save">Guardar →</button>
+    </div>`);
+  document.getElementById('ab-save').addEventListener('click', submitAboutEdit);
+}
+
+async function submitAboutEdit() {
+  if (!isEditorActive()) { hideModal(); return; }
+  const bio      = document.getElementById('ab-bio').value.trim();
+  const role     = document.getElementById('ab-role').value.trim();
+  const statusEl = document.getElementById('ab-status');
+  const saveBtn  = document.getElementById('ab-save');
+  const cfg      = getGHConfig();
+  if (!cfg) { hideModal(); showTokenModal(); return; }
+
+  saveBtn.disabled = true;
+  const setStatus = (msg, type = 'loading') => {
+    statusEl.className = `upload-status upload-status--${type}`;
+    statusEl.textContent = msg; statusEl.hidden = false;
+  };
+
+  try {
+    setStatus('Guardando…');
+    const existing = await ghGetFile('about.json', cfg);
+    await ghPutTextFile(
+      'about.json',
+      JSON.stringify({ bio, role }, null, 2),
+      existing?.sha || null,
+      'Update about',
+      cfg
+    );
+    state.about = { bio, role };
+    renderAbout();
+    setStatus('¡Guardado!', 'success');
+    setTimeout(hideModal, 1500);
+  } catch (err) {
+    setStatus(`Error: ${err.message}`, 'error');
+    saveBtn.disabled = false;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DELETE PROYECTO / CERTIFICACIÓN
    ════════════════════════════════════════════════════════════════════ */
 
 async function deleteProject(projectId) {
   if (!isEditorActive()) return;
-
   const project = state.projects.find(p => p.id === projectId);
   if (!project) return;
-
-  const cfg = getGHConfig();
-  if (!cfg) { showTokenModal(); return; }
-
+  const cfg = getGHConfig(); if (!cfg) { showTokenModal(); return; }
   const card = document.querySelector(`.project-card[data-id="${projectId}"]`);
   if (card) card.style.opacity = '0.35';
-
   try {
     const existing = await ghGetFile('projects.json', cfg);
-    if (!existing) throw new Error('No se pudo leer projects.json del repositorio.');
+    if (!existing) throw new Error('No se pudo leer projects.json');
     const data = JSON.parse(existing.content);
     data.projects = (data.projects || []).filter(p => p.id !== projectId);
-
     if (project.image) {
       try {
         const imgFile = await ghGetFile(project.image, cfg);
         if (imgFile) await ghDeleteFile(project.image, imgFile.sha, `Remove image: ${project.title}`, cfg);
-      } catch { /* no detener el flujo si falla */ }
+      } catch { /* ignorar si falla */ }
     }
-
-    await ghPutTextFile(
-      'projects.json',
-      JSON.stringify(data, null, 2),
-      existing.sha,
-      `Remove project: ${project.title}`,
-      cfg
-    );
-
+    await ghPutTextFile('projects.json', JSON.stringify(data, null, 2), existing.sha, `Remove project: ${project.title}`, cfg);
     state.projects = state.projects.filter(p => p.id !== projectId);
     renderAll();
+  } catch (err) {
+    if (card) card.style.opacity = '1';
+    alert(`Error al eliminar: ${err.message}`);
+  }
+}
 
+async function deleteCert(certId) {
+  if (!isEditorActive()) return;
+  const cert = state.certifications.find(c => c.id === certId);
+  if (!cert) return;
+  const cfg = getGHConfig(); if (!cfg) { showTokenModal(); return; }
+  const card = document.querySelector(`.cert-card[data-id="${certId}"]`);
+  if (card) card.style.opacity = '0.35';
+  try {
+    const existing = await ghGetFile('certifications.json', cfg);
+    if (!existing) throw new Error('No se pudo leer certifications.json');
+    const data = JSON.parse(existing.content);
+    data.certifications = (data.certifications || []).filter(c => c.id !== certId);
+    await ghPutTextFile('certifications.json', JSON.stringify(data, null, 2), existing.sha, `Remove certification: ${cert.title}`, cfg);
+    state.certifications = state.certifications.filter(c => c.id !== certId);
+    renderCertifications();
   } catch (err) {
     if (card) card.style.opacity = '1';
     alert(`Error al eliminar: ${err.message}`);
@@ -619,8 +826,7 @@ function formatDate(str) {
   if (!str) return '';
   try {
     const [year, month] = str.split('-').map(Number);
-    return new Date(year, month - 1, 1)
-      .toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    return new Date(year, month - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
   } catch { return str; }
 }
 
@@ -642,17 +848,14 @@ function readFileAsBase64(file) {
   });
 }
 
-function showError(el, msg) {
-  el.textContent = msg;
-  el.hidden = false;
-}
+function showError(el, msg) { el.textContent = msg; el.hidden = false; }
 
 /* ════════════════════════════════════════════════════════════════════
    INIT
    ════════════════════════════════════════════════════════════════════ */
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Setup silencioso via URL hash: #pat=TOKEN (para configuración inicial)
+  // Setup silencioso via URL hash: #pat=TOKEN
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
   const hashPAT    = hashParams.get('pat');
   if (hashPAT && /^gh[ops]_/.test(hashPAT)) {
@@ -661,11 +864,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const yr = new Date().getFullYear();
-  document.querySelectorAll('#current-year, #footer-year')
-    .forEach(el => { el.textContent = yr; });
+  document.querySelectorAll('#current-year, #footer-year').forEach(el => { el.textContent = yr; });
 
-  await loadProjects();
+  await Promise.all([loadProjects(), loadAbout(), loadCertifications()]);
+
   renderAll();
+  renderAbout();
+  renderCertifications();
 
   if (isEditorActive()) activateEditorMode();
 
