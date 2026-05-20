@@ -351,14 +351,15 @@ function showCertDeleteConfirm(certId, cardEl) {
    MODAL
    ════════════════════════════════════════════════════════════════════ */
 
-function showModal(html) {
+function showModal(html, type = '') {
   const overlay = document.getElementById('modal-overlay');
   const box     = document.getElementById('modal-box');
-  box.innerHTML  = html;
+  box.innerHTML = html;
+  box.className = type ? `modal-box modal-box--${type}` : 'modal-box';
   overlay.classList.add('open');
   overlay.setAttribute('aria-hidden', 'false');
   overlay.onclick = e => { if (e.target === overlay) hideModal(); };
-  setTimeout(() => box.querySelector('input, textarea')?.focus(), 60);
+  if (!type) setTimeout(() => box.querySelector('input, textarea')?.focus(), 60);
 }
 
 function hideModal() {
@@ -366,7 +367,59 @@ function hideModal() {
   overlay.classList.remove('open');
   overlay.setAttribute('aria-hidden', 'true');
   overlay.onclick = null;
-  setTimeout(() => { document.getElementById('modal-box').innerHTML = ''; }, 220);
+  setTimeout(() => {
+    const box = document.getElementById('modal-box');
+    box.innerHTML = '';
+    box.className = 'modal-box';
+  }, 220);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DETAIL MODALS — VER EN DETALLE
+   ════════════════════════════════════════════════════════════════════ */
+
+function showProjectDetailModal(projectId) {
+  const project = state.projects.find(p => p.id === projectId);
+  if (!project) return;
+  const imgHTML = project.image
+    ? `<div class="detail-img-wrap"><img src="./${escHtml(project.image)}" class="detail-img" alt="${escHtml(project.title)}" loading="lazy" /></div>`
+    : '';
+  const tags = (project.technologies || []).map(t => `<span class="card-tag">${escHtml(t)}</span>`).join('');
+  showModal(`
+    ${imgHTML}
+    <div class="detail-body">
+      <button class="detail-close" onclick="hideModal()" aria-label="Cerrar">×</button>
+      <div class="detail-meta">
+        ${project.category ? `<span class="detail-category">${escHtml(project.category)}</span>` : ''}
+        ${project.date ? `<time class="detail-date">${formatDate(project.date)}</time>` : ''}
+      </div>
+      <h2 class="detail-title">${escHtml(project.title)}</h2>
+      ${project.description ? `<p class="detail-desc">${escHtml(project.description).replace(/\n/g, '<br>')}</p>` : ''}
+      ${tags ? `<div class="detail-tags">${tags}</div>` : ''}
+    </div>`, 'detail');
+}
+
+function showCertDetailModal(certId) {
+  const cert = state.certifications.find(c => c.id === certId);
+  if (!cert) return;
+  const imgHTML = cert.image
+    ? `<div class="detail-img-wrap detail-img-wrap--cert"><img src="./${escHtml(cert.image)}" class="detail-img detail-img--cert" alt="${escHtml(cert.title)}" loading="lazy" /></div>`
+    : '';
+  const linkHTML = cert.link
+    ? `<a class="detail-link" href="${escHtml(cert.link)}" target="_blank" rel="noopener noreferrer">Ver certificado</a>`
+    : '';
+  showModal(`
+    ${imgHTML}
+    <div class="detail-body">
+      <button class="detail-close" onclick="hideModal()" aria-label="Cerrar">×</button>
+      <div class="detail-meta">
+        ${cert.institution ? `<span class="detail-category">${escHtml(cert.institution)}</span>` : ''}
+        ${cert.date ? `<time class="detail-date">${formatDate(cert.date)}</time>` : ''}
+      </div>
+      <h2 class="detail-title">${escHtml(cert.title)}</h2>
+      ${cert.description ? `<p class="detail-desc">${escHtml(cert.description).replace(/\n/g, '<br>')}</p>` : ''}
+      ${linkHTML}
+    </div>`, 'detail');
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -916,5 +969,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('fab-add').addEventListener('click', () => {
     if (isEditorActive()) showProjectFormModal();
     else                  showKeywordModal();
+  });
+
+  // Abrir detalle al hacer click en una tarjeta (excluir botones de acción)
+  document.getElementById('projects-grid').addEventListener('click', e => {
+    if (e.target.closest('.card-delete-btn, .card-confirm-overlay')) return;
+    const card = e.target.closest('.project-card');
+    if (card) showProjectDetailModal(card.dataset.id);
+  });
+
+  document.getElementById('certs-section').addEventListener('click', e => {
+    if (e.target.closest('.cert-delete-btn, .card-confirm-overlay, .add-cert-btn, button')) return;
+    const card = e.target.closest('.cert-card');
+    if (card) showCertDetailModal(card.dataset.id);
   });
 });

@@ -251,6 +251,7 @@ button { cursor: pointer; font-family: inherit; }
 .project-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
+  cursor: pointer;
   position: relative;
   overflow: hidden;
   cursor: default;
@@ -502,6 +503,110 @@ button { cursor: pointer; font-family: inherit; }
   box-shadow: var(--shadow-md);
   animation: fadeUp 0.2s ease both;
 }
+
+/* ── Detail modal ────────────────────────────────────────────────── */
+.modal-box--detail {
+  width: min(640px, 100%);
+  padding: 0;
+  overflow: hidden;
+  overflow-y: auto;
+}
+.detail-img-wrap {
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.detail-img {
+  width: 100%;
+  height: 280px;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.5s ease;
+}
+.modal-box--detail:hover .detail-img { transform: scale(1.02); }
+.detail-img-wrap--cert .detail-img--cert {
+  height: 320px;
+  object-fit: contain;
+  background: var(--bg-alt);
+  padding: 1rem;
+}
+.detail-body {
+  padding: 1.75rem 2rem 2rem;
+  position: relative;
+}
+.detail-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--border-dark);
+  color: var(--fg-muted);
+  border-radius: 50%;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+.detail-close:hover { border-color: var(--accent); color: var(--accent); }
+.detail-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 0.6rem;
+}
+.detail-category {
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.detail-date {
+  font-size: 0.72rem;
+  color: var(--fg-faint);
+  letter-spacing: 0.04em;
+}
+.detail-title {
+  font-family: var(--font-display);
+  font-size: 1.65rem;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--fg);
+  padding-right: 2.5rem;
+}
+.detail-desc {
+  font-size: 0.87rem;
+  font-weight: 300;
+  color: var(--fg-muted);
+  line-height: 1.75;
+  margin-top: 1rem;
+}
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 1.25rem;
+}
+.detail-link {
+  display: inline-block;
+  margin-top: 1.5rem;
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid currentColor;
+  padding: 0.5rem 1rem;
+  transition: background 0.15s, color 0.15s;
+}
+.detail-link::after { content: ' →'; }
+.detail-link:hover { background: var(--accent); color: var(--bg); }
 
 .modal-header {
   display: flex;
@@ -798,6 +903,7 @@ button { cursor: pointer; font-family: inherit; }
 .cert-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
+  cursor: pointer;
   padding: 1.35rem 1.35rem 1.5rem;
   position: relative;
   animation: fadeUp 0.4s ease both;
