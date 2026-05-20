@@ -27,6 +27,8 @@ const GH_API         = 'https://api.github.com';
 const state = {
   projects:       [],
   certifications: [],
+  services:       [],
+  tools:          [],
   about:          { bio: '', role: '' },
   contact:        { linkedin: '', whatsapp: '', email: '' },
   hero:           { line1: 'Trabajo', line2: 'seleccionado.', sub: 'Diseño y desarrollo.' },
@@ -184,6 +186,22 @@ async function loadContact() {
       email:    d.email    || '',
     };
   } catch { state.contact = { linkedin: '', whatsapp: '', email: '' }; }
+}
+
+async function loadServices() {
+  try {
+    const res = await fetch(`./services.json?t=${Date.now()}`);
+    if (!res.ok) throw new Error();
+    state.services = (await res.json()).services || [];
+  } catch { state.services = []; }
+}
+
+async function loadTools() {
+  try {
+    const res = await fetch(`./tools.json?t=${Date.now()}`);
+    if (!res.ok) throw new Error();
+    state.tools = (await res.json()).tools || [];
+  } catch { state.tools = []; }
 }
 
 async function loadHero() {
@@ -518,6 +536,158 @@ function renderContactHeader() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   RENDER — SERVICIOS
+   ════════════════════════════════════════════════════════════════════ */
+
+function renderServices() {
+  const section = document.getElementById('services-section');
+  if (!section) return;
+  if (state.services.length === 0 && !isEditorActive()) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  const addBtn = isEditorActive()
+    ? `<button class="add-cert-btn" id="add-service-btn">
+         <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+           <line x1="5.5" y1="1" x2="5.5" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+           <line x1="1" y1="5.5" x2="10" y2="5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+         </svg>
+         Agregar
+       </button>` : '';
+
+  const cardsHTML = state.services.length > 0
+    ? `<div class="services-grid">${state.services.map((s, i) => buildServiceCardHTML(s, i)).join('')}</div>`
+    : `<div class="certs-empty">No hay servicios todavía.</div>`;
+
+  section.innerHTML = `
+    <div class="section-header">
+      <h2 class="section-title">Servicios</h2>
+      ${addBtn}
+    </div>
+    ${cardsHTML}`;
+
+  document.getElementById('add-service-btn')?.addEventListener('click', () => showServiceFormModal(null));
+
+  if (isEditorActive()) {
+    section.querySelectorAll('.service-delete-btn').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); showServiceDeleteConfirm(btn.dataset.id, btn.closest('.service-card')); });
+    });
+    section.querySelectorAll('.service-edit-btn').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); showServiceEditModal(btn.dataset.id); });
+    });
+  }
+}
+
+function buildServiceCardHTML(service, idx) {
+  const id      = escHtml(service.id || '');
+  const imgEl   = service.image
+    ? `<div class="service-img-wrap"><img src="./${escHtml(service.image)}" alt="${escHtml(service.title)}" class="service-img" loading="lazy" /></div>`
+    : `<div class="service-img-wrap service-img-placeholder"><span class="placeholder-label">${escHtml(service.title?.[0] || '?')}</span></div>`;
+  const delBtn  = isEditorActive() ? `<button class="service-delete-btn" data-id="${id}" aria-label="Eliminar" title="Eliminar">×</button>` : '';
+  const editBtn = isEditorActive()
+    ? `<button class="service-edit-btn" data-id="${id}" aria-label="Editar" title="Editar">
+         <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+       </button>` : '';
+  return `
+    <div class="service-card" data-id="${id}" style="--card-i:${idx}">
+      ${editBtn}${delBtn}${imgEl}
+      <div class="service-body">
+        <h3 class="service-title">${escHtml(service.title)}</h3>
+        ${service.description ? `<p class="service-desc">${escHtml(service.description)}</p>` : ''}
+      </div>
+    </div>`.trim();
+}
+
+function showServiceDeleteConfirm(serviceId, cardEl) {
+  cardEl.querySelector('.card-confirm-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'card-confirm-overlay';
+  overlay.innerHTML = `
+    <p class="confirm-msg">¿Eliminar este servicio?</p>
+    <div class="confirm-btns">
+      <button class="btn btn-danger confirm-yes">Sí, eliminar</button>
+      <button class="btn btn-ghost confirm-no">Cancelar</button>
+    </div>`;
+  cardEl.appendChild(overlay);
+  overlay.querySelector('.confirm-no').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('.confirm-yes').addEventListener('click', () => { overlay.remove(); deleteService(serviceId); });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RENDER — HERRAMIENTAS
+   ════════════════════════════════════════════════════════════════════ */
+
+function renderTools() {
+  const section = document.getElementById('tools-section');
+  if (!section) return;
+  if (state.tools.length === 0 && !isEditorActive()) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  const addBtn = isEditorActive()
+    ? `<button class="add-cert-btn" id="add-tool-btn">
+         <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+           <line x1="5.5" y1="1" x2="5.5" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+           <line x1="1" y1="5.5" x2="10" y2="5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+         </svg>
+         Agregar
+       </button>` : '';
+
+  const toolsHTML = state.tools.length > 0
+    ? `<div class="tools-grid">${state.tools.map((t, i) => buildToolCardHTML(t, i)).join('')}</div>`
+    : `<div class="certs-empty">No hay herramientas todavía.</div>`;
+
+  section.innerHTML = `
+    <div class="section-header">
+      <h2 class="section-title">Herramientas</h2>
+      ${addBtn}
+    </div>
+    ${toolsHTML}`;
+
+  document.getElementById('add-tool-btn')?.addEventListener('click', () => showToolFormModal(null));
+
+  if (isEditorActive()) {
+    section.querySelectorAll('.tool-delete-btn').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); showToolDeleteConfirm(btn.dataset.id, btn.closest('.tool-card')); });
+    });
+    section.querySelectorAll('.tool-edit-btn').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); showToolEditModal(btn.dataset.id); });
+    });
+  }
+}
+
+function buildToolCardHTML(tool, idx) {
+  const id      = escHtml(tool.id || '');
+  const imgEl   = tool.image
+    ? `<img src="./${escHtml(tool.image)}" alt="${escHtml(tool.name)}" class="tool-img" loading="lazy" />`
+    : `<div class="tool-img-placeholder">${escHtml(tool.name?.[0] || '?')}</div>`;
+  const delBtn  = isEditorActive() ? `<button class="tool-delete-btn" data-id="${id}" aria-label="Eliminar" title="Eliminar">×</button>` : '';
+  const editBtn = isEditorActive()
+    ? `<button class="tool-edit-btn" data-id="${id}" aria-label="Editar" title="Editar">
+         <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+       </button>` : '';
+  return `
+    <div class="tool-card" data-id="${id}" style="--card-i:${idx}">
+      ${editBtn}${delBtn}
+      <div class="tool-img-wrap">${imgEl}</div>
+      <span class="tool-name">${escHtml(tool.name)}</span>
+    </div>`.trim();
+}
+
+function showToolDeleteConfirm(toolId, cardEl) {
+  cardEl.querySelector('.card-confirm-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'card-confirm-overlay';
+  overlay.innerHTML = `
+    <p class="confirm-msg">¿Eliminar esta herramienta?</p>
+    <div class="confirm-btns">
+      <button class="btn btn-danger confirm-yes">Sí, eliminar</button>
+      <button class="btn btn-ghost confirm-no">Cancelar</button>
+    </div>`;
+  cardEl.appendChild(overlay);
+  overlay.querySelector('.confirm-no').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('.confirm-yes').addEventListener('click', () => { overlay.remove(); deleteTool(toolId); });
+}
+
+/* ════════════════════════════════════════════════════════════════════
    MODAL
    ════════════════════════════════════════════════════════════════════ */
 
@@ -769,6 +939,8 @@ function activateEditorMode() {
   renderHero();
   renderProjects(state.activeFilter);
   renderAbout();
+  renderServices();
+  renderTools();
   renderCertifications();
   renderContactHeader();
 }
@@ -779,6 +951,8 @@ function deactivateEditorMode() {
   renderHero();
   renderProjects(state.activeFilter);
   renderAbout();
+  renderServices();
+  renderTools();
   renderCertifications();
   renderContactHeader();
 }
@@ -1442,6 +1616,321 @@ async function submitHeroEdit() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   MODAL SERVICIO (nuevo o editar)
+   ════════════════════════════════════════════════════════════════════ */
+
+function showServiceFormModal(existingService) {
+  if (!isEditorActive()) { showKeywordModal(); return; }
+  const isEdit = !!existingService;
+  const s = existingService || {};
+
+  const existingImgHTML = isEdit && s.image
+    ? `<div class="form-group">
+         <label class="form-label">Logo actual <span class="hint">(× para quitar)</span></label>
+         <div class="current-imgs" id="sv-current-img">
+           <div class="current-img-item" data-img="${escHtml(s.image)}">
+             <img src="./${escHtml(s.image)}" class="current-img-thumb" alt="Logo" />
+             <button type="button" class="current-img-remove" aria-label="Quitar">×</button>
+           </div>
+         </div>
+       </div>` : '';
+
+  showModal(`
+    <div class="modal-header">
+      <h3 class="modal-title">${isEdit ? 'Editar servicio' : 'Nuevo servicio'}</h3>
+      <button class="modal-close" onclick="hideModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="sv-title">Nombre del servicio <span class="req">*</span></label>
+      <input id="sv-title" type="text" class="form-input" placeholder="Diseño web" value="${escHtml(s.title || '')}" />
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="sv-desc">Descripción <span class="hint">(opcional)</span></label>
+      <textarea id="sv-desc" class="form-textarea" rows="3" placeholder="Breve descripción del servicio…">${escHtml(s.description || '')}</textarea>
+    </div>
+    ${existingImgHTML}
+    <div class="form-group">
+      <label class="form-label" for="sv-img">Logo / imagen <span class="hint">(opcional)</span></label>
+      <input id="sv-img" type="file" class="form-file" accept="image/*" />
+      <div class="new-imgs-preview" id="sv-img-preview"></div>
+    </div>
+    <div id="sv-status" class="upload-status" hidden></div>
+    <div id="sv-error"  class="form-error"    hidden></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
+      <button class="btn btn-primary" id="sv-submit">${isEdit ? 'Guardar cambios →' : 'Publicar →'}</button>
+    </div>`);
+
+  document.querySelector('#sv-current-img .current-img-remove')?.addEventListener('click', e => {
+    e.target.closest('.current-img-item').remove();
+  });
+  document.getElementById('sv-img').addEventListener('change', e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('sv-img-preview').innerHTML =
+        `<div class="new-img-preview-item"><img src="${ev.target.result}" class="new-img-thumb" alt="Preview" /></div>`;
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('sv-submit').addEventListener('click', () => {
+    if (isEdit) submitServiceEdit(s.id, s.image || null);
+    else        submitNewService();
+  });
+}
+
+function showServiceEditModal(serviceId) {
+  const service = state.services.find(s => s.id === serviceId);
+  if (!service) return;
+  showServiceFormModal(service);
+}
+
+async function submitNewService() {
+  if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
+  const title   = document.getElementById('sv-title').value.trim();
+  const desc    = document.getElementById('sv-desc').value.trim();
+  const imgFile = document.getElementById('sv-img').files[0];
+  const errEl   = document.getElementById('sv-error');
+  const statusEl= document.getElementById('sv-status');
+  const btn     = document.getElementById('sv-submit');
+
+  if (!title) { showError(errEl, 'El nombre es obligatorio.'); return; }
+  const cfg = getGHConfig(); if (!cfg) { hideModal(); showTokenModal(); return; }
+
+  btn.disabled = true; errEl.hidden = true;
+  const setStatus = (msg, type = 'loading') => { statusEl.className = `upload-status upload-status--${type}`; statusEl.textContent = msg; statusEl.hidden = false; };
+
+  const service = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    title, description: desc, image: null,
+  };
+
+  try {
+    if (imgFile) {
+      setStatus('Subiendo imagen…');
+      const base64 = await readFileAsBase64(imgFile);
+      const ext    = imgFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+      const fname  = `images/service_${service.id}.${ext}`;
+      await ghPutBinaryFile(fname, base64, null, `Add service image: ${title}`, cfg);
+      service.image = fname;
+    }
+    setStatus('Guardando…');
+    const existing = await ghGetFile('services.json', cfg);
+    let sha = null; let data = { services: [] };
+    if (existing) { sha = existing.sha; data = JSON.parse(existing.content); }
+    if (!Array.isArray(data.services)) data.services = [];
+    data.services.push(service);
+    await ghPutTextFile('services.json', JSON.stringify(data, null, 2), sha, `Add service: ${title}`, cfg);
+    state.services.push(service);
+    renderServices();
+    setStatus('¡Servicio publicado!', 'success');
+    setTimeout(hideModal, 1800);
+  } catch (err) { setStatus(`Error: ${err.message}`, 'error'); btn.disabled = false; }
+}
+
+async function submitServiceEdit(serviceId, originalImage) {
+  if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
+  const title   = document.getElementById('sv-title').value.trim();
+  const desc    = document.getElementById('sv-desc').value.trim();
+  const imgFile = document.getElementById('sv-img').files[0];
+  const errEl   = document.getElementById('sv-error');
+  const statusEl= document.getElementById('sv-status');
+  const btn     = document.getElementById('sv-submit');
+
+  if (!title) { showError(errEl, 'El nombre es obligatorio.'); return; }
+  const cfg = getGHConfig(); if (!cfg) { hideModal(); showTokenModal(); return; }
+
+  const keptImage = document.querySelector('#sv-current-img .current-img-item')?.dataset.img || null;
+
+  btn.disabled = true; errEl.hidden = true;
+  const setStatus = (msg, type = 'loading') => { statusEl.className = `upload-status upload-status--${type}`; statusEl.textContent = msg; statusEl.hidden = false; };
+
+  try {
+    let newImage = keptImage;
+    if (originalImage && !keptImage) {
+      setStatus('Eliminando imagen anterior…');
+      try { const f = await ghGetFile(originalImage, cfg); if (f) await ghDeleteFile(originalImage, f.sha, `Remove service image: ${title}`, cfg); } catch {}
+    }
+    if (imgFile) {
+      setStatus('Subiendo imagen…');
+      const base64 = await readFileAsBase64(imgFile);
+      const ext    = imgFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+      const fname  = `images/service_${serviceId}_${Date.now()}.${ext}`;
+      await ghPutBinaryFile(fname, base64, null, `Update service image: ${title}`, cfg);
+      newImage = fname;
+    }
+    setStatus('Guardando cambios…');
+    const existing = await ghGetFile('services.json', cfg);
+    if (!existing) throw new Error('No se pudo leer services.json');
+    const data = JSON.parse(existing.content);
+    const idx  = data.services.findIndex(s => s.id === serviceId);
+    if (idx === -1) throw new Error('Servicio no encontrado');
+    const updated = { ...data.services[idx], title, description: desc, image: newImage };
+    data.services[idx] = updated;
+    await ghPutTextFile('services.json', JSON.stringify(data, null, 2), existing.sha, `Update service: ${title}`, cfg);
+    const si = state.services.findIndex(s => s.id === serviceId);
+    if (si !== -1) state.services[si] = updated;
+    renderServices();
+    setStatus('¡Cambios guardados!', 'success');
+    setTimeout(hideModal, 1800);
+  } catch (err) { setStatus(`Error: ${err.message}`, 'error'); btn.disabled = false; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MODAL HERRAMIENTA (nueva o editar)
+   ════════════════════════════════════════════════════════════════════ */
+
+function showToolFormModal(existingTool) {
+  if (!isEditorActive()) { showKeywordModal(); return; }
+  const isEdit = !!existingTool;
+  const t = existingTool || {};
+
+  const existingImgHTML = isEdit && t.image
+    ? `<div class="form-group">
+         <label class="form-label">Logo actual <span class="hint">(× para quitar)</span></label>
+         <div class="current-imgs" id="tl-current-img">
+           <div class="current-img-item" data-img="${escHtml(t.image)}">
+             <img src="./${escHtml(t.image)}" class="current-img-thumb" alt="Logo" />
+             <button type="button" class="current-img-remove" aria-label="Quitar">×</button>
+           </div>
+         </div>
+       </div>` : '';
+
+  showModal(`
+    <div class="modal-header">
+      <h3 class="modal-title">${isEdit ? 'Editar herramienta' : 'Nueva herramienta'}</h3>
+      <button class="modal-close" onclick="hideModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="tl-name">Nombre <span class="req">*</span></label>
+      <input id="tl-name" type="text" class="form-input" placeholder="Figma" value="${escHtml(t.name || '')}" />
+    </div>
+    ${existingImgHTML}
+    <div class="form-group">
+      <label class="form-label" for="tl-img">Logo <span class="hint">(opcional — PNG transparente recomendado)</span></label>
+      <input id="tl-img" type="file" class="form-file" accept="image/*" />
+      <div class="new-imgs-preview" id="tl-img-preview"></div>
+    </div>
+    <div id="tl-status" class="upload-status" hidden></div>
+    <div id="tl-error"  class="form-error"    hidden></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
+      <button class="btn btn-primary" id="tl-submit">${isEdit ? 'Guardar cambios →' : 'Agregar →'}</button>
+    </div>`);
+
+  document.querySelector('#tl-current-img .current-img-remove')?.addEventListener('click', e => {
+    e.target.closest('.current-img-item').remove();
+  });
+  document.getElementById('tl-img').addEventListener('change', e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('tl-img-preview').innerHTML =
+        `<div class="new-img-preview-item"><img src="${ev.target.result}" class="new-img-thumb" alt="Preview" /></div>`;
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('tl-submit').addEventListener('click', () => {
+    if (isEdit) submitToolEdit(t.id, t.image || null);
+    else        submitNewTool();
+  });
+}
+
+function showToolEditModal(toolId) {
+  const tool = state.tools.find(t => t.id === toolId);
+  if (!tool) return;
+  showToolFormModal(tool);
+}
+
+async function submitNewTool() {
+  if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
+  const name    = document.getElementById('tl-name').value.trim();
+  const imgFile = document.getElementById('tl-img').files[0];
+  const errEl   = document.getElementById('tl-error');
+  const statusEl= document.getElementById('tl-status');
+  const btn     = document.getElementById('tl-submit');
+
+  if (!name) { showError(errEl, 'El nombre es obligatorio.'); return; }
+  const cfg = getGHConfig(); if (!cfg) { hideModal(); showTokenModal(); return; }
+
+  btn.disabled = true; errEl.hidden = true;
+  const setStatus = (msg, type = 'loading') => { statusEl.className = `upload-status upload-status--${type}`; statusEl.textContent = msg; statusEl.hidden = false; };
+
+  const tool = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name, image: null,
+  };
+
+  try {
+    if (imgFile) {
+      setStatus('Subiendo logo…');
+      const base64 = await readFileAsBase64(imgFile);
+      const ext    = imgFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+      const fname  = `images/tool_${tool.id}.${ext}`;
+      await ghPutBinaryFile(fname, base64, null, `Add tool logo: ${name}`, cfg);
+      tool.image = fname;
+    }
+    setStatus('Guardando…');
+    const existing = await ghGetFile('tools.json', cfg);
+    let sha = null; let data = { tools: [] };
+    if (existing) { sha = existing.sha; data = JSON.parse(existing.content); }
+    if (!Array.isArray(data.tools)) data.tools = [];
+    data.tools.push(tool);
+    await ghPutTextFile('tools.json', JSON.stringify(data, null, 2), sha, `Add tool: ${name}`, cfg);
+    state.tools.push(tool);
+    renderTools();
+    setStatus('¡Herramienta agregada!', 'success');
+    setTimeout(hideModal, 1800);
+  } catch (err) { setStatus(`Error: ${err.message}`, 'error'); btn.disabled = false; }
+}
+
+async function submitToolEdit(toolId, originalImage) {
+  if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
+  const name    = document.getElementById('tl-name').value.trim();
+  const imgFile = document.getElementById('tl-img').files[0];
+  const errEl   = document.getElementById('tl-error');
+  const statusEl= document.getElementById('tl-status');
+  const btn     = document.getElementById('tl-submit');
+
+  if (!name) { showError(errEl, 'El nombre es obligatorio.'); return; }
+  const cfg = getGHConfig(); if (!cfg) { hideModal(); showTokenModal(); return; }
+
+  const keptImage = document.querySelector('#tl-current-img .current-img-item')?.dataset.img || null;
+
+  btn.disabled = true; errEl.hidden = true;
+  const setStatus = (msg, type = 'loading') => { statusEl.className = `upload-status upload-status--${type}`; statusEl.textContent = msg; statusEl.hidden = false; };
+
+  try {
+    let newImage = keptImage;
+    if (originalImage && !keptImage) {
+      try { const f = await ghGetFile(originalImage, cfg); if (f) await ghDeleteFile(originalImage, f.sha, `Remove tool logo: ${name}`, cfg); } catch {}
+    }
+    if (imgFile) {
+      setStatus('Subiendo logo…');
+      const base64 = await readFileAsBase64(imgFile);
+      const ext    = imgFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+      const fname  = `images/tool_${toolId}_${Date.now()}.${ext}`;
+      await ghPutBinaryFile(fname, base64, null, `Update tool logo: ${name}`, cfg);
+      newImage = fname;
+    }
+    setStatus('Guardando cambios…');
+    const existing = await ghGetFile('tools.json', cfg);
+    if (!existing) throw new Error('No se pudo leer tools.json');
+    const data = JSON.parse(existing.content);
+    const idx  = data.tools.findIndex(t => t.id === toolId);
+    if (idx === -1) throw new Error('Herramienta no encontrada');
+    const updated = { ...data.tools[idx], name, image: newImage };
+    data.tools[idx] = updated;
+    await ghPutTextFile('tools.json', JSON.stringify(data, null, 2), existing.sha, `Update tool: ${name}`, cfg);
+    const ti = state.tools.findIndex(t => t.id === toolId);
+    if (ti !== -1) state.tools[ti] = updated;
+    renderTools();
+    setStatus('¡Cambios guardados!', 'success');
+    setTimeout(hideModal, 1800);
+  } catch (err) { setStatus(`Error: ${err.message}`, 'error'); btn.disabled = false; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    DELETE PROYECTO / CERTIFICACIÓN
    ════════════════════════════════════════════════════════════════════ */
 
@@ -1499,6 +1988,48 @@ async function deleteCert(certId) {
   }
 }
 
+async function deleteService(serviceId) {
+  if (!isEditorActive()) return;
+  const service = state.services.find(s => s.id === serviceId);
+  if (!service) return;
+  const cfg = getGHConfig(); if (!cfg) { showTokenModal(); return; }
+  const card = document.querySelector(`.service-card[data-id="${serviceId}"]`);
+  if (card) card.style.opacity = '0.35';
+  try {
+    const existing = await ghGetFile('services.json', cfg);
+    if (!existing) throw new Error('No se pudo leer services.json');
+    const data = JSON.parse(existing.content);
+    data.services = (data.services || []).filter(s => s.id !== serviceId);
+    if (service.image) {
+      try { const f = await ghGetFile(service.image, cfg); if (f) await ghDeleteFile(service.image, f.sha, `Remove service image: ${service.title}`, cfg); } catch {}
+    }
+    await ghPutTextFile('services.json', JSON.stringify(data, null, 2), existing.sha, `Remove service: ${service.title}`, cfg);
+    state.services = state.services.filter(s => s.id !== serviceId);
+    renderServices();
+  } catch (err) { if (card) card.style.opacity = '1'; alert(`Error al eliminar: ${err.message}`); }
+}
+
+async function deleteTool(toolId) {
+  if (!isEditorActive()) return;
+  const tool = state.tools.find(t => t.id === toolId);
+  if (!tool) return;
+  const cfg = getGHConfig(); if (!cfg) { showTokenModal(); return; }
+  const card = document.querySelector(`.tool-card[data-id="${toolId}"]`);
+  if (card) card.style.opacity = '0.35';
+  try {
+    const existing = await ghGetFile('tools.json', cfg);
+    if (!existing) throw new Error('No se pudo leer tools.json');
+    const data = JSON.parse(existing.content);
+    data.tools = (data.tools || []).filter(t => t.id !== toolId);
+    if (tool.image) {
+      try { const f = await ghGetFile(tool.image, cfg); if (f) await ghDeleteFile(tool.image, f.sha, `Remove tool logo: ${tool.name}`, cfg); } catch {}
+    }
+    await ghPutTextFile('tools.json', JSON.stringify(data, null, 2), existing.sha, `Remove tool: ${tool.name}`, cfg);
+    state.tools = state.tools.filter(t => t.id !== toolId);
+    renderTools();
+  } catch (err) { if (card) card.style.opacity = '1'; alert(`Error al eliminar: ${err.message}`); }
+}
+
 /* ════════════════════════════════════════════════════════════════════
    UTILIDADES
    ════════════════════════════════════════════════════════════════════ */
@@ -1554,11 +2085,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const yr = new Date().getFullYear();
   document.querySelectorAll('#current-year, #footer-year').forEach(el => { el.textContent = yr; });
 
-  await Promise.all([loadProjects(), loadAbout(), loadCertifications(), loadContact(), loadHero()]);
+  await Promise.all([loadProjects(), loadAbout(), loadCertifications(), loadContact(), loadHero(), loadServices(), loadTools()]);
 
   renderHero();
   renderAll();
   renderAbout();
+  renderServices();
+  renderTools();
   renderCertifications();
   renderContactHeader();
 
