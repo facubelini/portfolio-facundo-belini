@@ -3,25 +3,28 @@
 
    Modelo de seguridad:
    ─ Palabra clave  → verificada por sesión (sessionStorage)
-   ─ GH config      → localStorage (PAT, owner, repo, branch)
+   ─ PAT            → localStorage, ingresado una sola vez
+   ─ owner/repo/branch → hardcodeados aquí (son públicos de todas formas)
    ─ DOM de edición → inyectado SOLO después de verificación
    ─ Write API      → doble-check isEditorActive() antes de cada fetch
-
-   La palabra clave evita acciones accidentales (UI gate).
-   El PAT es la protección real de los datos del repositorio.
    ================================================================ */
 
 'use strict';
 
+/* ─── Config del repositorio (no sensible — el repo es público) ── */
+const GH_OWNER  = 'facubelini';
+const GH_REPO   = 'portfolio-facundo-belini';
+const GH_BRANCH = 'main';
+
 /* ─── Constantes ─────────────────────────────────────────────────── */
 const KEYWORD        = 'Blogdelporta1!';
 const MAX_ATTEMPTS   = 5;
-const LOCKOUT_MS     = 5 * 60 * 1000;   // 5 minutos
-const GH_CONFIG_KEY  = 'pflio_gh_config';
+const LOCKOUT_MS     = 5 * 60 * 1000;
+const GH_PAT_KEY     = 'pflio_pat';
 const EDITOR_SES_KEY = 'pflio_editor_active';
 const GH_API         = 'https://api.github.com';
 
-/* ─── Estado en memoria (se resetea con cada carga de página) ────── */
+/* ─── Estado en memoria ──────────────────────────────────────────── */
 const state = {
   projects:       [],
   activeFilter:   'Todos',
@@ -30,7 +33,7 @@ const state = {
 };
 
 /* ════════════════════════════════════════════════════════════════════
-   SESIÓN DE EDITOR
+   SESIÓN Y CONFIGURACIÓN
    ════════════════════════════════════════════════════════════════════ */
 
 const isEditorActive  = () => sessionStorage.getItem(EDITOR_SES_KEY) === 'true';
@@ -38,11 +41,12 @@ const activateSession = () => sessionStorage.setItem(EDITOR_SES_KEY, 'true');
 const clearSession    = () => sessionStorage.removeItem(EDITOR_SES_KEY);
 
 function getGHConfig() {
-  try { return JSON.parse(localStorage.getItem(GH_CONFIG_KEY)); }
-  catch { return null; }
+  const pat = localStorage.getItem(GH_PAT_KEY);
+  if (!pat) return null;
+  return { owner: GH_OWNER, repo: GH_REPO, branch: GH_BRANCH, pat };
 }
-function saveGHConfig(cfg) {
-  localStorage.setItem(GH_CONFIG_KEY, JSON.stringify(cfg));
+function savePAT(pat) {
+  localStorage.setItem(GH_PAT_KEY, pat);
 }
 
 function lockoutRemaining() {
@@ -64,7 +68,6 @@ function ghHeaders(pat) {
   };
 }
 
-/** GET un archivo del repo. Devuelve { sha, content } o null si no existe. */
 async function ghGetFile(path, cfg) {
   const url = `${GH_API}/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${cfg.branch}`;
   const res = await fetch(url, { headers: ghHeaders(cfg.pat) });
@@ -77,11 +80,9 @@ async function ghGetFile(path, cfg) {
   };
 }
 
-/** PUT un archivo de texto (UTF-8 → base64). */
 async function ghPutTextFile(path, text, sha, msg, cfg) {
-  if (!isEditorActive()) throw new Error('Sesión de editor inactiva — operación cancelada.');
-  const content = textToBase64(text);
-  const body    = { message: msg, content, branch: cfg.branch };
+  if (!isEditorActive()) throw new Error('Sesión inactiva — operación cancelada.');
+  const body = { message: msg, content: textToBase64(text), branch: cfg.branch };
   if (sha) body.sha = sha;
   const res = await fetch(`${GH_API}/repos/${cfg.owner}/${cfg.repo}/contents/${path}`, {
     method: 'PUT', headers: ghHeaders(cfg.pat), body: JSON.stringify(body),
@@ -93,9 +94,8 @@ async function ghPutTextFile(path, text, sha, msg, cfg) {
   return res.json();
 }
 
-/** PUT un archivo binario (base64 directo desde FileReader). */
 async function ghPutBinaryFile(path, base64, sha, msg, cfg) {
-  if (!isEditorActive()) throw new Error('Sesión de editor inactiva — operación cancelada.');
+  if (!isEditorActive()) throw new Error('Sesión inactiva — operación cancelada.');
   const body = { message: msg, content: base64, branch: cfg.branch };
   if (sha) body.sha = sha;
   const res = await fetch(`${GH_API}/repos/${cfg.owner}/${cfg.repo}/contents/${path}`, {
@@ -108,9 +108,8 @@ async function ghPutBinaryFile(path, base64, sha, msg, cfg) {
   return res.json();
 }
 
-/** DELETE un archivo del repo. */
 async function ghDeleteFile(path, sha, msg, cfg) {
-  if (!isEditorActive()) throw new Error('Sesión de editor inactiva — operación cancelada.');
+  if (!isEditorActive()) throw new Error('Sesión inactiva — operación cancelada.');
   const res = await fetch(`${GH_API}/repos/${cfg.owner}/${cfg.repo}/contents/${path}`, {
     method: 'DELETE', headers: ghHeaders(cfg.pat),
     body: JSON.stringify({ message: msg, sha, branch: cfg.branch }),
@@ -123,7 +122,7 @@ async function ghDeleteFile(path, sha, msg, cfg) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   CARGAR Y RENDERIZAR PROYECTOS
+   PROYECTOS — CARGA Y RENDER
    ════════════════════════════════════════════════════════════════════ */
 
 async function loadProjects() {
@@ -178,7 +177,6 @@ function renderProjects(filter) {
   }
   empty.hidden   = true;
   grid.innerHTML = list.map((p, i) => buildCardHTML(p, i)).join('');
-
   if (isEditorActive()) attachDeleteHandlers();
 }
 
@@ -196,7 +194,7 @@ function buildCardHTML(project, idx) {
     .map(t => `<span class="card-tag">${escHtml(t)}</span>`).join('');
 
   const delBtn = isEditorActive()
-    ? `<button class="card-delete-btn" data-id="${id}" aria-label="Eliminar ${escHtml(project.title)}" title="Eliminar">×</button>`
+    ? `<button class="card-delete-btn" data-id="${id}" aria-label="Eliminar" title="Eliminar proyecto">×</button>`
     : '';
 
   return `
@@ -218,14 +216,12 @@ function attachDeleteHandlers() {
   document.querySelectorAll('.card-delete-btn').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      const card = btn.closest('.project-card');
-      showDeleteConfirm(btn.dataset.id, card);
+      showDeleteConfirm(btn.dataset.id, btn.closest('.project-card'));
     });
   });
 }
 
 function showDeleteConfirm(projectId, cardEl) {
-  // Quitar overlay previo si existe
   cardEl.querySelector('.card-confirm-overlay')?.remove();
   const overlay = document.createElement('div');
   overlay.className = 'card-confirm-overlay';
@@ -250,7 +246,7 @@ function updateCounter() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   SISTEMA DE MODAL
+   MODAL
    ════════════════════════════════════════════════════════════════════ */
 
 function showModal(html) {
@@ -260,7 +256,6 @@ function showModal(html) {
   overlay.classList.add('open');
   overlay.setAttribute('aria-hidden', 'false');
   overlay.onclick = e => { if (e.target === overlay) hideModal(); };
-  // Foco en primer input si existe
   setTimeout(() => box.querySelector('input, textarea')?.focus(), 60);
 }
 
@@ -272,12 +267,8 @@ function hideModal() {
   setTimeout(() => { document.getElementById('modal-box').innerHTML = ''; }, 220);
 }
 
-function setModalContent(html) {
-  document.getElementById('modal-box').innerHTML = html;
-}
-
 /* ════════════════════════════════════════════════════════════════════
-   GATE DE PALABRA CLAVE — sin shortcuts, sin excepciones
+   GATE — PALABRA CLAVE
    ════════════════════════════════════════════════════════════════════ */
 
 function showKeywordModal() {
@@ -305,7 +296,7 @@ function showKeywordModal() {
       <h3 class="modal-title">Modo editor</h3>
       <button class="modal-close" onclick="hideModal()">×</button>
     </div>
-    <p class="modal-sub">Ingresá la palabra clave para activar el modo editor.</p>
+    <p class="modal-sub">Ingresá la palabra clave para continuar.</p>
     <div class="form-group">
       <label class="form-label" for="kw-input">Palabra clave</label>
       <input id="kw-input" type="password" class="form-input"
@@ -319,36 +310,28 @@ function showKeywordModal() {
     </div>
   `);
 
-  const input  = document.getElementById('kw-input');
-  const errEl  = document.getElementById('kw-error');
-  const btn    = document.getElementById('kw-btn');
-
-  const submit = () => {
-    const val = input.value;   // Sin trim — la clave se compara exacta
-    if (!val) { showError(errEl, 'Ingresá la palabra clave.'); return; }
-    handleKeywordSubmit(val, errEl, btn, input);
-  };
-
+  const input = document.getElementById('kw-input');
+  const errEl = document.getElementById('kw-error');
+  const btn   = document.getElementById('kw-btn');
+  const submit = () => handleKeywordSubmit(input.value, errEl, btn, input);
   btn.addEventListener('click', submit);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
 }
 
 function handleKeywordSubmit(value, errEl, btn, input) {
   if (value === KEYWORD) {
-    // ✓ Correcto
     state.failedAttempts = 0;
     activateSession();
     activateEditorMode();
     hideModal();
-    const cfg = getGHConfig();
     setTimeout(() => {
-      if (!cfg) showSetupModal();
-      else showProjectFormModal();
+      const pat = localStorage.getItem(GH_PAT_KEY);
+      if (!pat) showTokenModal();
+      else      showProjectFormModal();
     }, 260);
     return;
   }
 
-  // ✗ Incorrecto
   state.failedAttempts++;
   if (state.failedAttempts >= MAX_ATTEMPTS) {
     state.lockoutUntil = Date.now() + LOCKOUT_MS;
@@ -363,7 +346,49 @@ function handleKeywordSubmit(value, errEl, btn, input) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   ACTIVAR / DESACTIVAR MODO EDITOR
+   MODAL DE TOKEN (primera vez)
+   ════════════════════════════════════════════════════════════════════ */
+
+function showTokenModal() {
+  showModal(`
+    <div class="modal-header">
+      <h3 class="modal-title">Token de GitHub</h3>
+      <button class="modal-close" onclick="hideModal()">×</button>
+    </div>
+    <p class="modal-sub">
+      Solo necesitás ingresarlo una vez — se guarda en tu navegador.<br>
+      Necesitás un <strong>fine-grained PAT</strong> con acceso a
+      <code style="font-size:0.8em;background:var(--bg-alt);padding:0.1em 0.4em;">portfolio-facundo-belini</code>
+      y permiso <strong>Contents: Read and write</strong>.
+    </p>
+    <div class="form-group">
+      <label class="form-label" for="tok-input">Personal Access Token <span class="req">*</span></label>
+      <input id="tok-input" type="password" class="form-input"
+             placeholder="github_pat_..." autocomplete="off" spellcheck="false" />
+    </div>
+    <div id="tok-error" class="form-error" hidden></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
+      <button class="btn btn-primary" id="tok-save-btn">Guardar →</button>
+    </div>
+  `);
+
+  const input = document.getElementById('tok-input');
+  const errEl = document.getElementById('tok-error');
+  const btn   = document.getElementById('tok-save-btn');
+  const save  = () => {
+    const pat = input.value.trim();
+    if (!pat) { showError(errEl, 'Ingresá el token.'); return; }
+    savePAT(pat);
+    hideModal();
+    setTimeout(() => showProjectFormModal(), 260);
+  };
+  btn.addEventListener('click', save);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MODO EDITOR — ACTIVAR / DESACTIVAR
    ════════════════════════════════════════════════════════════════════ */
 
 function activateEditorMode() {
@@ -377,12 +402,10 @@ function activateEditorMode() {
     <span class="editor-label">Modo editor</span>
     <button class="editor-exit-btn" id="editor-exit-btn">Salir</button>
   `;
-  // Insertar en header-right si existe, sino al final del header
   const right = header.querySelector('.header-right');
   if (right) right.prepend(ind);
   else header.appendChild(ind);
   document.getElementById('editor-exit-btn').addEventListener('click', deactivateEditorMode);
-  // Re-renderizar con botones de borrar
   renderProjects(state.activeFilter);
 }
 
@@ -390,63 +413,6 @@ function deactivateEditorMode() {
   clearSession();
   document.getElementById('editor-indicator')?.remove();
   renderProjects(state.activeFilter);
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   MODAL DE CONFIGURACIÓN DE GITHUB
-   ════════════════════════════════════════════════════════════════════ */
-
-function showSetupModal() {
-  const cfg = getGHConfig() || { owner: '', repo: '', pat: '', branch: 'main' };
-  showModal(`
-    <div class="modal-header">
-      <h3 class="modal-title">Configurar GitHub</h3>
-      <button class="modal-close" onclick="hideModal()">×</button>
-    </div>
-    <p class="modal-sub">
-      Estos datos se guardan solo en tu navegador (localStorage).<br>
-      No se envían a ningún servidor externo.
-    </p>
-    <div class="form-group">
-      <label class="form-label" for="s-owner">Usuario de GitHub <span class="req">*</span></label>
-      <input id="s-owner" type="text" class="form-input" value="${escHtml(cfg.owner)}"
-             placeholder="tu-usuario" autocomplete="off" spellcheck="false" />
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="s-repo">Nombre del repositorio <span class="req">*</span></label>
-      <input id="s-repo" type="text" class="form-input" value="${escHtml(cfg.repo)}"
-             placeholder="mi-portfolio" autocomplete="off" spellcheck="false" />
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="s-pat">Personal Access Token <span class="req">*</span></label>
-      <input id="s-pat" type="password" class="form-input" value="${escHtml(cfg.pat)}"
-             placeholder="github_pat_..." autocomplete="off" />
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="s-branch">Branch</label>
-      <input id="s-branch" type="text" class="form-input" value="${escHtml(cfg.branch)}"
-             placeholder="main" autocomplete="off" />
-    </div>
-    <div id="s-error" class="form-error" hidden></div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
-      <button class="btn btn-primary" id="s-save-btn">Guardar y continuar →</button>
-    </div>
-  `);
-
-  document.getElementById('s-save-btn').addEventListener('click', () => {
-    const owner  = document.getElementById('s-owner').value.trim();
-    const repo   = document.getElementById('s-repo').value.trim();
-    const pat    = document.getElementById('s-pat').value.trim();
-    const branch = document.getElementById('s-branch').value.trim() || 'main';
-    const errEl  = document.getElementById('s-error');
-    if (!owner || !repo || !pat) {
-      showError(errEl, 'Usuario, repositorio y token son obligatorios.'); return;
-    }
-    saveGHConfig({ owner, repo, pat, branch });
-    hideModal();
-    setTimeout(() => showProjectFormModal(), 260);
-  });
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -476,7 +442,7 @@ function showProjectFormModal() {
     </div>
     <div class="form-group">
       <label class="form-label" for="pf-desc">Descripción</label>
-      <textarea id="pf-desc" class="form-textarea" placeholder="Descripción breve del proyecto…"></textarea>
+      <textarea id="pf-desc" class="form-textarea" placeholder="Descripción breve…"></textarea>
     </div>
     <div class="form-group">
       <label class="form-label" for="pf-tech">
@@ -493,7 +459,7 @@ function showProjectFormModal() {
       </div>
     </div>
     <div id="pf-status" class="upload-status" hidden></div>
-    <div id="pf-error" class="form-error" hidden></div>
+    <div id="pf-error"  class="form-error"    hidden></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
       <button class="btn btn-primary" id="pf-submit">Publicar →</button>
@@ -505,10 +471,8 @@ function showProjectFormModal() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
-      const img  = document.getElementById('img-preview');
-      const wrap = document.getElementById('img-preview-wrap');
-      img.src    = ev.target.result;
-      wrap.hidden = false;
+      document.getElementById('img-preview').src = ev.target.result;
+      document.getElementById('img-preview-wrap').hidden = false;
     };
     reader.readAsDataURL(file);
   });
@@ -517,7 +481,6 @@ function showProjectFormModal() {
 }
 
 async function submitNewProject() {
-  // Doble-check de sesión antes de cualquier escritura
   if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
 
   const title    = document.getElementById('pf-title').value.trim();
@@ -528,21 +491,21 @@ async function submitNewProject() {
   const imgFile  = document.getElementById('pf-img').files[0];
   const errEl    = document.getElementById('pf-error');
   const statusEl = document.getElementById('pf-status');
-  const submitBtn = document.getElementById('pf-submit');
+  const submitBtn= document.getElementById('pf-submit');
 
   if (!title || !category) {
     showError(errEl, 'Título y categoría son obligatorios.'); return;
   }
   const cfg = getGHConfig();
-  if (!cfg) { hideModal(); showSetupModal(); return; }
+  if (!cfg) { hideModal(); showTokenModal(); return; }
 
   submitBtn.disabled = true;
   errEl.hidden = true;
 
   const setStatus = (msg, type = 'loading') => {
-    statusEl.className = `upload-status upload-status--${type}`;
+    statusEl.className  = `upload-status upload-status--${type}`;
     statusEl.textContent = msg;
-    statusEl.hidden = false;
+    statusEl.hidden      = false;
   };
 
   const project = {
@@ -556,7 +519,6 @@ async function submitNewProject() {
   };
 
   try {
-    // 1. Subir imagen si hay
     if (imgFile) {
       setStatus('Subiendo imagen…');
       const base64 = await readFileAsBase64(imgFile);
@@ -566,7 +528,6 @@ async function submitNewProject() {
       project.image = fname;
     }
 
-    // 2. Leer projects.json actual (para obtener SHA)
     setStatus('Guardando proyecto…');
     const existing = await ghGetFile('projects.json', cfg);
     let sha = null;
@@ -577,7 +538,6 @@ async function submitNewProject() {
     }
     if (!Array.isArray(data.projects)) data.projects = [];
 
-    // 3. Agregar y escribir
     data.projects.push(project);
     await ghPutTextFile(
       'projects.json',
@@ -587,12 +547,10 @@ async function submitNewProject() {
       cfg
     );
 
-    // 4. Actualizar estado local y re-renderizar
     state.projects.push(project);
     renderAll();
-
-    setStatus('¡Proyecto publicado correctamente!', 'success');
-    setTimeout(hideModal, 2000);
+    setStatus('¡Proyecto publicado!', 'success');
+    setTimeout(hideModal, 1800);
 
   } catch (err) {
     setStatus(`Error: ${err.message}`, 'error');
@@ -605,36 +563,30 @@ async function submitNewProject() {
    ════════════════════════════════════════════════════════════════════ */
 
 async function deleteProject(projectId) {
-  // Doble-check de sesión
   if (!isEditorActive()) return;
 
   const project = state.projects.find(p => p.id === projectId);
   if (!project) return;
 
   const cfg = getGHConfig();
-  if (!cfg) { showSetupModal(); return; }
+  if (!cfg) { showTokenModal(); return; }
 
   const card = document.querySelector(`.project-card[data-id="${projectId}"]`);
   if (card) card.style.opacity = '0.35';
 
   try {
-    // 1. Leer projects.json
     const existing = await ghGetFile('projects.json', cfg);
     if (!existing) throw new Error('No se pudo leer projects.json del repositorio.');
     const data = JSON.parse(existing.content);
     data.projects = (data.projects || []).filter(p => p.id !== projectId);
 
-    // 2. Intentar borrar imagen si existe
     if (project.image) {
       try {
         const imgFile = await ghGetFile(project.image, cfg);
-        if (imgFile) {
-          await ghDeleteFile(project.image, imgFile.sha, `Remove image: ${project.title}`, cfg);
-        }
-      } catch { /* no detener el flujo si falla el borrado de imagen */ }
+        if (imgFile) await ghDeleteFile(project.image, imgFile.sha, `Remove image: ${project.title}`, cfg);
+      } catch { /* no detener el flujo si falla */ }
     }
 
-    // 3. Actualizar projects.json
     await ghPutTextFile(
       'projects.json',
       JSON.stringify(data, null, 2),
@@ -643,7 +595,6 @@ async function deleteProject(projectId) {
       cfg
     );
 
-    // 4. Actualizar estado local
     state.projects = state.projects.filter(p => p.id !== projectId);
     renderAll();
 
@@ -660,11 +611,8 @@ async function deleteProject(projectId) {
 function escHtml(str) {
   if (str == null) return '';
   return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function formatDate(str) {
@@ -676,18 +624,15 @@ function formatDate(str) {
   } catch { return str; }
 }
 
-/** Convierte string UTF-8 a base64 de forma segura (soporta caracteres no-ASCII). */
 function textToBase64(str) {
   const bytes = new TextEncoder().encode(str);
   let binary  = '';
   const chunk = 8192;
-  for (let i = 0; i < bytes.length; i += chunk) {
+  for (let i = 0; i < bytes.length; i += chunk)
     binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-  }
   return btoa(binary);
 }
 
-/** Lee un File y devuelve el contenido base64 (sin el prefijo data:...;base64,). */
 function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -707,24 +652,17 @@ function showError(el, msg) {
    ════════════════════════════════════════════════════════════════════ */
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Año actual en header y footer
   const yr = new Date().getFullYear();
   document.querySelectorAll('#current-year, #footer-year')
     .forEach(el => { el.textContent = yr; });
 
-  // Cargar y renderizar proyectos
   await loadProjects();
   renderAll();
 
-  // Restaurar modo editor si la sesión sigue activa
   if (isEditorActive()) activateEditorMode();
 
-  // FAB — SIEMPRE pasa por el gate de palabra clave
   document.getElementById('fab-add').addEventListener('click', () => {
-    if (isEditorActive()) {
-      showProjectFormModal();
-    } else {
-      showKeywordModal();
-    }
+    if (isEditorActive()) showProjectFormModal();
+    else                  showKeywordModal();
   });
 });
