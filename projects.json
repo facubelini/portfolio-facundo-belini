@@ -3,22 +3,22 @@
     {
       "id": "sample01",
       "title": "Identidad visual para estudio de arquitectura",
-      "category": "DiseÃ±o",
+      "category": "DiseÃÂ±o",
       "date": "2024-03",
-      "description": "Sistema de identidad completo para un estudio de arquitectura boutique. Incluye logotipo, tipografÃ­a, paleta de color y aplicaciones en papelerÃ­a y digital.",
+      "description": "Sistema de identidad completo para un estudio de arquitectura boutique. Incluye logotipo, tipografÃÂ­a, paleta de color y aplicaciones en papelerÃÂ­a y digital.",
       "technologies": [
         "Figma",
         "Illustrator",
-        "TipografÃ­a variable"
+        "TipografÃÂ­a variable"
       ],
       "image": null
     },
     {
       "id": "sample02",
-      "title": "App de seguimiento de hÃ¡bitos",
+      "title": "App de seguimiento de hÃÂ¡bitos",
       "category": "Desarrollo",
       "date": "2024-06",
-      "description": "AplicaciÃ³n web progresiva para registro y visualizaciÃ³n de hÃ¡bitos diarios. DiseÃ±o con enfoque en fricciÃ³n mÃ­nima e interfaz limpia.",
+      "description": "AplicaciÃÂ³n web progresiva para registro y visualizaciÃÂ³n de hÃÂ¡bitos diarios. DiseÃÂ±o con enfoque en fricciÃÂ³n mÃÂ­nima e interfaz limpia.",
       "technologies": [
         "JavaScript",
         "IndexedDB",
@@ -35,6 +35,17 @@
       "description": "",
       "technologies": [],
       "image": "images/mpe51jegrnv3.jpeg"
+    },
+    {
+      "id": "mpe5hs0y404u",
+      "title": "Test",
+      "category": "Marketing",
+      "date": null,
+      "description": "",
+      "technologies": [
+        "Meta Ads"
+      ],
+      "image": "images/mpe5hs0y404u.png"
     }
   ]
 }
