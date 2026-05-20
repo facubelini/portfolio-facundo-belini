@@ -652,6 +652,14 @@ function showError(el, msg) {
    ════════════════════════════════════════════════════════════════════ */
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Setup silencioso via URL hash: #pat=TOKEN (para configuración inicial)
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const hashPAT    = hashParams.get('pat');
+  if (hashPAT && /^gh[ops]_/.test(hashPAT)) {
+    localStorage.setItem(GH_PAT_KEY, hashPAT);
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+
   const yr = new Date().getFullYear();
   document.querySelectorAll('#current-year, #footer-year')
     .forEach(el => { el.textContent = yr; });
