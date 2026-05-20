@@ -1345,6 +1345,21 @@ button { cursor: pointer; font-family: inherit; }
 }
 .contact-header-edit-btn:hover { background: var(--accent-dark); opacity: 1; transform: scale(1.08); }
 
+.contact-header-add-btn {
+  background: var(--accent);
+  border: none;
+  padding: 0.28rem 0.75rem;
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg);
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.contact-header-add-btn:hover { background: var(--fg); color: var(--accent); }
+
 /* ── Hero edit button ───────────────────────────────────────────── */
 .hero-edit-btn {
   display: inline-flex;

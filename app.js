@@ -499,10 +499,17 @@ function renderContactHeader() {
 
   if (isEditorActive()) {
     const btn = document.createElement('button');
-    btn.className = 'contact-header-edit-btn';
-    btn.title = 'Editar contacto';
-    btn.setAttribute('aria-label', 'Editar contacto');
-    btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    if (keys.length === 0) {
+      // Sin datos: botón de texto visible
+      btn.className = 'contact-header-add-btn';
+      btn.textContent = '+ Contacto';
+    } else {
+      // Con datos: lápiz pequeño junto a los íconos
+      btn.className = 'contact-header-edit-btn';
+      btn.title = 'Editar contacto';
+      btn.setAttribute('aria-label', 'Editar contacto');
+      btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
     btn.addEventListener('click', showContactEditModal);
     nav.appendChild(btn);
   }
