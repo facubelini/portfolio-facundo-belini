@@ -854,6 +854,20 @@ button { cursor: pointer; font-family: inherit; }
 .cert-link:hover { opacity: 0.65; }
 .cert-link::after { content: ' →'; }
 
+.cert-img-wrap {
+  margin: -1.35rem -1.35rem 1rem;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.cert-img {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+}
+.cert-card:hover .cert-img { transform: scale(1.02); }
+
 .cert-delete-btn {
   position: absolute;
   top: 0.5rem;

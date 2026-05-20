@@ -68,12 +68,17 @@ function ghHeaders(pat) {
 }
 
 async function ghGetFile(path, cfg) {
-  const url = `${GH_API}/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${cfg.branch}`;
-  const res = await fetch(url, { headers: ghHeaders(cfg.pat) });
+  const url = `${GH_API}/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${cfg.branch}&_=${Date.now()}`;
+  const res = await fetch(url, {
+    headers: { ...ghHeaders(cfg.pat), 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+  });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`GitHub ${res.status}: ${res.statusText}`);
   const data = await res.json();
-  return { sha: data.sha, content: atob(data.content.replace(/\n/g, '')) };
+  const binary = atob(data.content.replace(/\n/g, ''));
+  const bytes  = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return { sha: data.sha, content: new TextDecoder('utf-8').decode(bytes) };
 }
 
 async function ghPutTextFile(path, text, sha, msg, cfg) {
@@ -310,12 +315,15 @@ function buildCertCardHTML(cert, idx) {
   const id     = escHtml(cert.id || '');
   const delBtn = isEditorActive()
     ? `<button class="cert-delete-btn" data-id="${id}" aria-label="Eliminar" title="Eliminar">×</button>` : '';
+  const imgEl = cert.image
+    ? `<div class="cert-img-wrap"><img src="./${escHtml(cert.image)}" alt="${escHtml(cert.title)}" class="cert-img" loading="lazy" /></div>` : '';
   const linkEl = cert.link
     ? `<a class="cert-link" href="${escHtml(cert.link)}" target="_blank" rel="noopener noreferrer">Ver certificado</a>` : '';
 
   return `
     <div class="cert-card" data-id="${id}" style="--card-i:${idx}">
       ${delBtn}
+      ${imgEl}
       <p class="cert-institution">${escHtml(cert.institution || '')}</p>
       <h3 class="cert-title">${escHtml(cert.title)}</h3>
       ${cert.date ? `<time class="cert-date" datetime="${escHtml(cert.date)}">${formatDate(cert.date)}</time>` : ''}
@@ -637,12 +645,28 @@ function showCertFormModal() {
       <label class="form-label" for="cf-link">Link al certificado <span class="hint">(opcional)</span></label>
       <input id="cf-link" type="url" class="form-input" placeholder="https://…" />
     </div>
+    <div class="form-group">
+      <label class="form-label" for="cf-img">Imagen del diploma <span class="hint">(opcional)</span></label>
+      <input id="cf-img" type="file" class="form-file" accept="image/*" />
+      <div class="image-preview-wrap" id="cf-img-preview-wrap" hidden>
+        <img id="cf-img-preview" class="image-preview" alt="Vista previa" />
+      </div>
+    </div>
     <div id="cf-status" class="upload-status" hidden></div>
     <div id="cf-error"  class="form-error"    hidden></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
       <button class="btn btn-primary" id="cf-submit">Publicar →</button>
     </div>`);
+  document.getElementById('cf-img').addEventListener('change', e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('cf-img-preview').src = ev.target.result;
+      document.getElementById('cf-img-preview-wrap').hidden = false;
+    };
+    reader.readAsDataURL(file);
+  });
   document.getElementById('cf-submit').addEventListener('click', submitNewCert);
 }
 
@@ -653,6 +677,7 @@ async function submitNewCert() {
   const date     = document.getElementById('cf-date').value;
   const desc     = document.getElementById('cf-desc').value.trim();
   const link     = document.getElementById('cf-link').value.trim();
+  const imgFile  = document.getElementById('cf-img').files[0];
   const errEl    = document.getElementById('cf-error');
   const statusEl = document.getElementById('cf-status');
   const submitBtn= document.getElementById('cf-submit');
@@ -670,10 +695,18 @@ async function submitNewCert() {
   const cert = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     title, institution: inst, date: date || null,
-    description: desc, link: link || null,
+    description: desc, link: link || null, image: null,
   };
 
   try {
+    if (imgFile) {
+      setStatus('Subiendo imagen…');
+      const base64 = await readFileAsBase64(imgFile);
+      const ext    = imgFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+      const fname  = `images/cert_${cert.id}.${ext}`;
+      await ghPutBinaryFile(fname, base64, null, `Add cert image: ${title}`, cfg);
+      cert.image = fname;
+    }
     setStatus('Guardando…');
     const existing = await ghGetFile('certifications.json', cfg);
     let sha = null; let data = { certifications: [] };
@@ -802,6 +835,12 @@ async function deleteCert(certId) {
     if (!existing) throw new Error('No se pudo leer certifications.json');
     const data = JSON.parse(existing.content);
     data.certifications = (data.certifications || []).filter(c => c.id !== certId);
+    if (cert.image) {
+      try {
+        const imgFile = await ghGetFile(cert.image, cfg);
+        if (imgFile) await ghDeleteFile(cert.image, imgFile.sha, `Remove cert image: ${cert.title}`, cfg);
+      } catch { /* ignorar si falla */ }
+    }
     await ghPutTextFile('certifications.json', JSON.stringify(data, null, 2), existing.sha, `Remove certification: ${cert.title}`, cfg);
     state.certifications = state.certifications.filter(c => c.id !== certId);
     renderCertifications();
