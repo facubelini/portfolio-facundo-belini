@@ -67,11 +67,20 @@ function ghHeaders(pat) {
   };
 }
 
+// GET requests don't need Content-Type — keeping it off avoids some
+// browser/proxy edge cases with CORS preflight on read operations
+function ghReadHeaders(pat) {
+  return {
+    'Authorization': `token ${pat}`,
+    'Accept':        'application/vnd.github.v3+json',
+  };
+}
+
 async function ghGetFile(path, cfg) {
   // &_ timestamp busts the browser cache without needing Cache-Control headers
   // (Cache-Control/Pragma trigger CORS preflight failures on GitHub API)
   const url = `${GH_API}/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${cfg.branch}&_=${Date.now()}`;
-  const res = await fetch(url, { headers: ghHeaders(cfg.pat) });
+  const res = await fetch(url, { headers: ghReadHeaders(cfg.pat) });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`GitHub ${res.status}: ${res.statusText}`);
   const data = await res.json();
