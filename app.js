@@ -29,6 +29,7 @@ const state = {
   certifications: [],
   about:          { bio: '', role: '' },
   contact:        { linkedin: '', whatsapp: '', email: '' },
+  hero:           { line1: 'Trabajo', line2: 'seleccionado.', sub: 'Diseño y desarrollo.' },
   activeFilter:   'Todos',
   failedAttempts: 0,
   lockoutUntil:   null,
@@ -183,6 +184,42 @@ async function loadContact() {
       email:    d.email    || '',
     };
   } catch { state.contact = { linkedin: '', whatsapp: '', email: '' }; }
+}
+
+async function loadHero() {
+  try {
+    const res = await fetch(`./hero.json?t=${Date.now()}`);
+    if (!res.ok) throw new Error();
+    const d = await res.json();
+    state.hero = {
+      line1: d.line1 || 'Trabajo',
+      line2: d.line2 || 'seleccionado.',
+      sub:   d.sub   || 'Diseño y desarrollo.',
+    };
+  } catch { state.hero = { line1: 'Trabajo', line2: 'seleccionado.', sub: 'Diseño y desarrollo.' }; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RENDER — HERO
+   ════════════════════════════════════════════════════════════════════ */
+
+function renderHero() {
+  const l1 = document.getElementById('hero-line1');
+  const l2 = document.getElementById('hero-line2');
+  const sb = document.getElementById('hero-sub');
+  if (l1) l1.textContent = state.hero.line1;
+  if (l2) l2.textContent = state.hero.line2;
+  if (sb) sb.textContent = state.hero.sub;
+
+  const section = document.getElementById('hero-section');
+  section?.querySelector('.hero-edit-btn')?.remove();
+  if (isEditorActive() && section) {
+    const btn = document.createElement('button');
+    btn.className = 'hero-edit-btn';
+    btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Editar intro`;
+    btn.addEventListener('click', showHeroEditModal);
+    section.querySelector('.hero-text')?.appendChild(btn);
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -414,7 +451,7 @@ function showCertDeleteConfirm(certId, cardEl) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   RENDER — CONTACTO
+   RENDER — CONTACTO (en el header)
    ════════════════════════════════════════════════════════════════════ */
 
 const CONTACT_ICONS = {
@@ -435,41 +472,42 @@ function getContactHref(type, value) {
   return value; // linkedin: full URL
 }
 
-function renderContact() {
-  const section = document.getElementById('contact-section');
-  if (!section) return;
+function renderContactHeader() {
+  const wrap = document.getElementById('contact-header-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+
   const { linkedin, whatsapp, email } = state.contact;
-  const hasAny = linkedin || whatsapp || email;
+  const keys = ['linkedin', 'whatsapp', 'email'].filter(k => state.contact[k]);
 
-  if (!hasAny && !isEditorActive()) { section.style.display = 'none'; return; }
-  section.style.display = '';
+  if (keys.length === 0 && !isEditorActive()) return;
 
-  const editBtn = isEditorActive()
-    ? `<button class="about-edit-btn" id="contact-edit-btn">Editar</button>` : '';
+  const nav = document.createElement('div');
+  nav.className = 'contact-header-links';
 
-  const links = ['linkedin', 'whatsapp', 'email']
-    .filter(k => state.contact[k])
-    .map(k => `
-      <a class="contact-link contact-link--${k}"
+  keys.forEach(k => {
+    nav.insertAdjacentHTML('beforeend', `
+      <a class="contact-header-link contact-header-link--${k}"
          href="${escHtml(getContactHref(k, state.contact[k]))}"
          target="${k === 'email' ? '_self' : '_blank'}"
          rel="noopener noreferrer"
+         title="${CONTACT_LABELS[k]}"
          aria-label="${CONTACT_LABELS[k]}">
-        <span class="contact-icon">${CONTACT_ICONS[k]}</span>
-        <span class="contact-link-label">${CONTACT_LABELS[k]}</span>
-      </a>`).join('');
+        ${CONTACT_ICONS[k]}
+      </a>`);
+  });
 
-  const placeholder = isEditorActive() && !hasAny
-    ? `<p style="color:var(--fg-faint);font-style:italic;font-size:0.85rem;">Hacé clic en "Editar" para agregar tu contacto.</p>` : '';
+  if (isEditorActive()) {
+    const btn = document.createElement('button');
+    btn.className = 'contact-header-edit-btn';
+    btn.title = 'Editar contacto';
+    btn.setAttribute('aria-label', 'Editar contacto');
+    btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    btn.addEventListener('click', showContactEditModal);
+    nav.appendChild(btn);
+  }
 
-  section.innerHTML = `
-    <span class="about-label">Contacto</span>
-    <div class="about-body">
-      ${editBtn}
-      <div class="contact-links">${links || placeholder}</div>
-    </div>`;
-
-  document.getElementById('contact-edit-btn')?.addEventListener('click', showContactEditModal);
+  wrap.appendChild(nav);
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -721,19 +759,21 @@ function activateEditorMode() {
     if (right) right.prepend(ind); else header.appendChild(ind);
     document.getElementById('editor-exit-btn').addEventListener('click', deactivateEditorMode);
   }
+  renderHero();
   renderProjects(state.activeFilter);
   renderAbout();
   renderCertifications();
-  renderContact();
+  renderContactHeader();
 }
 
 function deactivateEditorMode() {
   clearSession();
   document.getElementById('editor-indicator')?.remove();
+  renderHero();
   renderProjects(state.activeFilter);
   renderAbout();
   renderCertifications();
-  renderContact();
+  renderContactHeader();
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -1327,6 +1367,74 @@ async function submitContactEdit() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   MODAL EDITAR HERO
+   ════════════════════════════════════════════════════════════════════ */
+
+function showHeroEditModal() {
+  if (!isEditorActive()) return;
+  const { line1, line2, sub } = state.hero;
+  showModal(`
+    <div class="modal-header">
+      <h3 class="modal-title">Textos del inicio</h3>
+      <button class="modal-close" onclick="hideModal()">×</button>
+    </div>
+    <p class="modal-sub">El título grande y el subtítulo que se ven al abrir el portfolio.</p>
+    <div class="form-group">
+      <label class="form-label" for="hr-line1">Línea 1 <span class="hint">(color negro)</span></label>
+      <input id="hr-line1" type="text" class="form-input" value="${escHtml(line1)}" placeholder="Trabajo" />
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="hr-line2">Línea 2 <span class="hint">(color amarillo)</span></label>
+      <input id="hr-line2" type="text" class="form-input" value="${escHtml(line2)}" placeholder="seleccionado." />
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="hr-sub">Subtítulo</label>
+      <input id="hr-sub" type="text" class="form-input" value="${escHtml(sub)}" placeholder="Diseño y desarrollo." />
+    </div>
+    <div id="hr-status" class="upload-status" hidden></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
+      <button class="btn btn-primary" id="hr-save">Guardar →</button>
+    </div>`);
+  document.getElementById('hr-save').addEventListener('click', submitHeroEdit);
+}
+
+async function submitHeroEdit() {
+  if (!isEditorActive()) { hideModal(); return; }
+  const line1 = document.getElementById('hr-line1').value.trim() || 'Trabajo';
+  const line2 = document.getElementById('hr-line2').value.trim() || 'seleccionado.';
+  const sub   = document.getElementById('hr-sub').value.trim()   || 'Diseño y desarrollo.';
+  const statusEl = document.getElementById('hr-status');
+  const saveBtn  = document.getElementById('hr-save');
+  const cfg      = getGHConfig();
+  if (!cfg) { hideModal(); showTokenModal(); return; }
+
+  saveBtn.disabled = true;
+  const setStatus = (msg, type = 'loading') => {
+    statusEl.className = `upload-status upload-status--${type}`;
+    statusEl.textContent = msg; statusEl.hidden = false;
+  };
+  try {
+    setStatus('Guardando…');
+    const existing = await ghGetFile('hero.json', cfg);
+    await ghPutTextFile(
+      'hero.json',
+      JSON.stringify({ line1, line2, sub }, null, 2),
+      existing?.sha || null,
+      'Update hero text',
+      cfg
+    );
+    state.hero = { line1, line2, sub };
+    renderHero();
+    setStatus('¡Guardado!', 'success');
+    setTimeout(hideModal, 1500);
+  } catch (err) {
+    setStatus(`Error: ${err.message}`, 'error');
+    saveBtn.disabled = false;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    DELETE PROYECTO / CERTIFICACIÓN
    ════════════════════════════════════════════════════════════════════ */
 
@@ -1439,12 +1547,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const yr = new Date().getFullYear();
   document.querySelectorAll('#current-year, #footer-year').forEach(el => { el.textContent = yr; });
 
-  await Promise.all([loadProjects(), loadAbout(), loadCertifications(), loadContact()]);
+  await Promise.all([loadProjects(), loadAbout(), loadCertifications(), loadContact(), loadHero()]);
 
+  renderHero();
   renderAll();
   renderAbout();
   renderCertifications();
-  renderContact();
+  renderContactHeader();
 
   if (isEditorActive()) activateEditorMode();
 

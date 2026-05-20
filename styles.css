@@ -1027,6 +1027,7 @@ button { cursor: pointer; font-family: inherit; }
   align-items: center;
   justify-content: center;
   opacity: 0;
+  z-index: 10;
   transition: opacity 0.15s, background 0.15s;
 }
 .cert-card:hover .cert-delete-btn { opacity: 1; }
@@ -1301,6 +1302,67 @@ button { cursor: pointer; font-family: inherit; }
   position: relative;
   top: -1px;
 }
+
+/* ── Contacto en el header ──────────────────────────────────────── */
+#contact-header-wrap {
+  display: flex;
+  align-items: center;
+}
+.contact-header-links {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+.contact-header-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--fg-muted);
+  border-radius: 50%;
+  transition: color 0.15s, background 0.15s, transform 0.15s;
+  text-decoration: none;
+}
+.contact-header-link:hover { transform: scale(1.12); }
+.contact-header-link--linkedin:hover { color: #0A66C2; background: rgba(10,102,194,0.08); }
+.contact-header-link--whatsapp:hover { color: #25D366; background: rgba(37,211,102,0.08); }
+.contact-header-link--email:hover    { color: var(--accent-dark); background: rgba(245,197,24,0.12); }
+
+.contact-header-edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: var(--accent);
+  color: var(--fg);
+  border: none;
+  border-radius: 50%;
+  margin-left: 0.25rem;
+  transition: background 0.15s, transform 0.15s;
+  opacity: 0.7;
+}
+.contact-header-edit-btn:hover { background: var(--accent-dark); opacity: 1; transform: scale(1.08); }
+
+/* ── Hero edit button ───────────────────────────────────────────── */
+.hero-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 1.25rem;
+  background: none;
+  border: 1.5px solid var(--border-dark);
+  padding: 0.25rem 0.7rem;
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.hero-edit-btn:hover { border-color: var(--fg); color: var(--fg); background: var(--accent); }
 
 /* ── Responsive ─────────────────────────────────────────────────── */
 @media (max-width: 900px) {
