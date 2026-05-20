@@ -28,10 +28,15 @@ const state = {
   projects:       [],
   certifications: [],
   about:          { bio: '', role: '' },
+  contact:        { linkedin: '', whatsapp: '', email: '' },
   activeFilter:   'Todos',
   failedAttempts: 0,
   lockoutUntil:   null,
 };
+
+/* ─── Carousel state ─────────────────────────────────────────────── */
+let _carouselIdx  = 0;
+let _carouselImgs = [];
 
 /* ════════════════════════════════════════════════════════════════════
    SESIÓN Y CONFIG
@@ -67,8 +72,6 @@ function ghHeaders(pat) {
   };
 }
 
-// GET requests don't need Content-Type — keeping it off avoids some
-// browser/proxy edge cases with CORS preflight on read operations
 function ghReadHeaders(pat) {
   return {
     'Authorization': `token ${pat}`,
@@ -77,8 +80,6 @@ function ghReadHeaders(pat) {
 }
 
 async function ghGetFile(path, cfg) {
-  // &_ timestamp busts the browser cache without needing Cache-Control headers
-  // (Cache-Control/Pragma trigger CORS preflight failures on GitHub API)
   const url = `${GH_API}/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${cfg.branch}&_=${Date.now()}`;
   const res = await fetch(url, { headers: ghReadHeaders(cfg.pat) });
   if (res.status === 404) return null;
@@ -132,6 +133,17 @@ async function ghDeleteFile(path, sha, msg, cfg) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   HELPERS
+   ════════════════════════════════════════════════════════════════════ */
+
+/** Normaliza campo image/images para backward compat. Siempre retorna array. */
+function getImages(item) {
+  if (Array.isArray(item.images) && item.images.length > 0) return item.images;
+  if (item.image) return [item.image];
+  return [];
+}
+
+/* ════════════════════════════════════════════════════════════════════
    CARGA DE DATOS
    ════════════════════════════════════════════════════════════════════ */
 
@@ -158,6 +170,19 @@ async function loadCertifications() {
     if (!res.ok) throw new Error();
     state.certifications = (await res.json()).certifications || [];
   } catch { state.certifications = []; }
+}
+
+async function loadContact() {
+  try {
+    const res = await fetch(`./contact.json?t=${Date.now()}`);
+    if (!res.ok) throw new Error();
+    const d = await res.json();
+    state.contact = {
+      linkedin: d.linkedin || '',
+      whatsapp: d.whatsapp || '',
+      email:    d.email    || '',
+    };
+  } catch { state.contact = { linkedin: '', whatsapp: '', email: '' }; }
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -195,21 +220,31 @@ function renderProjects(filter) {
   if (list.length === 0) { grid.innerHTML = ''; empty.hidden = false; return; }
   empty.hidden   = true;
   grid.innerHTML = list.map((p, i) => buildCardHTML(p, i)).join('');
-  if (isEditorActive()) attachDeleteHandlers();
+  if (isEditorActive()) attachCardEditorHandlers();
 }
 
 function buildCardHTML(project, idx) {
-  const id  = escHtml(project.id || '');
-  const img = project.image
-    ? `<div class="card-img-wrap"><img src="./${escHtml(project.image)}" alt="${escHtml(project.title)}" class="card-img" loading="lazy" /></div>`
+  const id     = escHtml(project.id || '');
+  const images = getImages(project);
+  const img    = images.length > 0
+    ? `<div class="card-img-wrap">
+         ${images.length > 1 ? `<span class="card-img-count">${images.length} imgs</span>` : ''}
+         <img src="./${escHtml(images[0])}" alt="${escHtml(project.title)}" class="card-img" loading="lazy" />
+       </div>`
     : `<div class="card-img-wrap card-img-placeholder"><span class="placeholder-label" aria-hidden="true">${escHtml(project.category || '—')}</span></div>`;
-  const tags   = (project.technologies || []).map(t => `<span class="card-tag">${escHtml(t)}</span>`).join('');
-  const delBtn = isEditorActive()
+  const tags    = (project.technologies || []).map(t => `<span class="card-tag">${escHtml(t)}</span>`).join('');
+  const delBtn  = isEditorActive()
     ? `<button class="card-delete-btn" data-id="${id}" aria-label="Eliminar" title="Eliminar">×</button>` : '';
+  const editBtn = isEditorActive()
+    ? `<button class="card-edit-btn" data-id="${id}" aria-label="Editar" title="Editar">
+         <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+           <path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+         </svg>
+       </button>` : '';
 
   return `
     <article class="project-card" data-id="${id}" style="--card-i:${idx}">
-      ${delBtn}${img}
+      ${editBtn}${delBtn}${img}
       <div class="card-body">
         <span class="card-category">${escHtml(project.category || '')}</span>
         <h2 class="card-title">${escHtml(project.title)}</h2>
@@ -220,11 +255,17 @@ function buildCardHTML(project, idx) {
     </article>`.trim();
 }
 
-function attachDeleteHandlers() {
+function attachCardEditorHandlers() {
   document.querySelectorAll('.card-delete-btn').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       showDeleteConfirm(btn.dataset.id, btn.closest('.project-card'));
+    });
+  });
+  document.querySelectorAll('.card-edit-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      showProjectEditModal(btn.dataset.id);
     });
   });
 }
@@ -308,7 +349,7 @@ function renderCertifications() {
     </div>
     ${cardsHTML}`;
 
-  document.getElementById('add-cert-btn')?.addEventListener('click', showCertFormModal);
+  document.getElementById('add-cert-btn')?.addEventListener('click', () => showCertFormModal(null));
 
   if (isEditorActive()) {
     section.querySelectorAll('.cert-delete-btn').forEach(btn => {
@@ -317,21 +358,37 @@ function renderCertifications() {
         showCertDeleteConfirm(btn.dataset.id, btn.closest('.cert-card'));
       });
     });
+    section.querySelectorAll('.cert-edit-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        showCertEditModal(btn.dataset.id);
+      });
+    });
   }
 }
 
 function buildCertCardHTML(cert, idx) {
-  const id     = escHtml(cert.id || '');
-  const delBtn = isEditorActive()
+  const id      = escHtml(cert.id || '');
+  const images  = getImages(cert);
+  const delBtn  = isEditorActive()
     ? `<button class="cert-delete-btn" data-id="${id}" aria-label="Eliminar" title="Eliminar">×</button>` : '';
-  const imgEl = cert.image
-    ? `<div class="cert-img-wrap"><img src="./${escHtml(cert.image)}" alt="${escHtml(cert.title)}" class="cert-img" loading="lazy" /></div>` : '';
+  const editBtn = isEditorActive()
+    ? `<button class="cert-edit-btn" data-id="${id}" aria-label="Editar" title="Editar">
+         <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+           <path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+         </svg>
+       </button>` : '';
+  const imgEl = images.length > 0
+    ? `<div class="cert-img-wrap">
+         ${images.length > 1 ? `<span class="card-img-count">${images.length} imgs</span>` : ''}
+         <img src="./${escHtml(images[0])}" alt="${escHtml(cert.title)}" class="cert-img" loading="lazy" />
+       </div>` : '';
   const linkEl = cert.link
     ? `<a class="cert-link" href="${escHtml(cert.link)}" target="_blank" rel="noopener noreferrer">Ver certificado</a>` : '';
 
   return `
     <div class="cert-card" data-id="${id}" style="--card-i:${idx}">
-      ${delBtn}
+      ${editBtn}${delBtn}
       ${imgEl}
       <p class="cert-institution">${escHtml(cert.institution || '')}</p>
       <h3 class="cert-title">${escHtml(cert.title)}</h3>
@@ -354,6 +411,65 @@ function showCertDeleteConfirm(certId, cardEl) {
   cardEl.appendChild(overlay);
   overlay.querySelector('.confirm-no').addEventListener('click',  () => overlay.remove());
   overlay.querySelector('.confirm-yes').addEventListener('click', () => { overlay.remove(); deleteCert(certId); });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RENDER — CONTACTO
+   ════════════════════════════════════════════════════════════════════ */
+
+const CONTACT_ICONS = {
+  linkedin: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>`,
+  whatsapp: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>`,
+  email:    `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>`,
+};
+
+const CONTACT_LABELS = {
+  linkedin: 'LinkedIn',
+  whatsapp: 'WhatsApp',
+  email:    'Email',
+};
+
+function getContactHref(type, value) {
+  if (type === 'email')    return `mailto:${value}`;
+  if (type === 'whatsapp') return `https://wa.me/${value.replace(/\D/g, '')}`;
+  return value; // linkedin: full URL
+}
+
+function renderContact() {
+  const section = document.getElementById('contact-section');
+  if (!section) return;
+  const { linkedin, whatsapp, email } = state.contact;
+  const hasAny = linkedin || whatsapp || email;
+
+  if (!hasAny && !isEditorActive()) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  const editBtn = isEditorActive()
+    ? `<button class="about-edit-btn" id="contact-edit-btn">Editar</button>` : '';
+
+  const links = ['linkedin', 'whatsapp', 'email']
+    .filter(k => state.contact[k])
+    .map(k => `
+      <a class="contact-link contact-link--${k}"
+         href="${escHtml(getContactHref(k, state.contact[k]))}"
+         target="${k === 'email' ? '_self' : '_blank'}"
+         rel="noopener noreferrer"
+         aria-label="${CONTACT_LABELS[k]}">
+        <span class="contact-icon">${CONTACT_ICONS[k]}</span>
+        <span class="contact-link-label">${CONTACT_LABELS[k]}</span>
+      </a>`).join('');
+
+  const placeholder = isEditorActive() && !hasAny
+    ? `<p style="color:var(--fg-faint);font-style:italic;font-size:0.85rem;">Hacé clic en "Editar" para agregar tu contacto.</p>` : '';
+
+  section.innerHTML = `
+    <span class="about-label">Contacto</span>
+    <div class="about-body">
+      ${editBtn}
+      <div class="contact-links">${links || placeholder}</div>
+    </div>`;
+
+  document.getElementById('contact-edit-btn')?.addEventListener('click', showContactEditModal);
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -384,16 +500,68 @@ function hideModal() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   CAROUSEL
+   ════════════════════════════════════════════════════════════════════ */
+
+function buildCarouselHTML(images, altText) {
+  if (images.length === 0) return '';
+  if (images.length === 1) {
+    return `
+      <div class="detail-img-wrap">
+        <img src="./${escHtml(images[0])}" class="detail-img" alt="${escHtml(altText)}" loading="lazy" />
+      </div>`;
+  }
+  const dots = images.map((_, i) =>
+    `<button class="carousel-dot${i === 0 ? ' active' : ''}" data-idx="${i}" aria-label="Imagen ${i + 1}"></button>`
+  ).join('');
+  return `
+    <div class="detail-carousel" id="detail-carousel">
+      <img src="./${escHtml(images[0])}" class="detail-carousel-img" id="carousel-main-img" alt="${escHtml(altText)}" loading="lazy" />
+      <button class="carousel-arrow carousel-arrow--prev" onclick="carouselNav(-1)" aria-label="Anterior">
+        <svg width="16" height="16" viewBox="0 0 18 18" fill="none"><polyline points="11,3 5,9 11,15" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="carousel-arrow carousel-arrow--next" onclick="carouselNav(1)" aria-label="Siguiente">
+        <svg width="16" height="16" viewBox="0 0 18 18" fill="none"><polyline points="7,3 13,9 7,15" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="carousel-dots">${dots}</div>
+    </div>`;
+}
+
+function carouselNav(dir) {
+  if (_carouselImgs.length < 2) return;
+  _carouselIdx = (_carouselIdx + dir + _carouselImgs.length) % _carouselImgs.length;
+  updateCarousel();
+}
+
+function updateCarousel() {
+  const img  = document.getElementById('carousel-main-img');
+  const dots = document.querySelectorAll('.carousel-dot');
+  if (img) img.src = `./${_carouselImgs[_carouselIdx]}`;
+  dots.forEach((d, i) => d.classList.toggle('active', i === _carouselIdx));
+}
+
+function bindCarouselDots() {
+  document.querySelectorAll('.carousel-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      _carouselIdx = parseInt(dot.dataset.idx, 10);
+      updateCarousel();
+    });
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════════
    DETAIL MODALS — VER EN DETALLE
    ════════════════════════════════════════════════════════════════════ */
 
 function showProjectDetailModal(projectId) {
   const project = state.projects.find(p => p.id === projectId);
   if (!project) return;
-  const imgHTML = project.image
-    ? `<div class="detail-img-wrap"><img src="./${escHtml(project.image)}" class="detail-img" alt="${escHtml(project.title)}" loading="lazy" /></div>`
-    : '';
-  const tags = (project.technologies || []).map(t => `<span class="card-tag">${escHtml(t)}</span>`).join('');
+  const images  = getImages(project);
+  _carouselImgs = images;
+  _carouselIdx  = 0;
+  const imgHTML = buildCarouselHTML(images, project.title);
+  const tags    = (project.technologies || []).map(t => `<span class="card-tag">${escHtml(t)}</span>`).join('');
+
   showModal(`
     ${imgHTML}
     <div class="detail-body">
@@ -406,17 +574,21 @@ function showProjectDetailModal(projectId) {
       ${project.description ? `<p class="detail-desc">${escHtml(project.description).replace(/\n/g, '<br>')}</p>` : ''}
       ${tags ? `<div class="detail-tags">${tags}</div>` : ''}
     </div>`, 'detail');
+
+  if (images.length > 1) bindCarouselDots();
 }
 
 function showCertDetailModal(certId) {
-  const cert = state.certifications.find(c => c.id === certId);
+  const cert   = state.certifications.find(c => c.id === certId);
   if (!cert) return;
-  const imgHTML = cert.image
-    ? `<div class="detail-img-wrap detail-img-wrap--cert"><img src="./${escHtml(cert.image)}" class="detail-img detail-img--cert" alt="${escHtml(cert.title)}" loading="lazy" /></div>`
-    : '';
+  const images  = getImages(cert);
+  _carouselImgs = images;
+  _carouselIdx  = 0;
+  const imgHTML = buildCarouselHTML(images, cert.title);
   const linkHTML = cert.link
     ? `<a class="detail-link" href="${escHtml(cert.link)}" target="_blank" rel="noopener noreferrer">Ver certificado</a>`
     : '';
+
   showModal(`
     ${imgHTML}
     <div class="detail-body">
@@ -429,6 +601,8 @@ function showCertDetailModal(certId) {
       ${cert.description ? `<p class="detail-desc">${escHtml(cert.description).replace(/\n/g, '<br>')}</p>` : ''}
       ${linkHTML}
     </div>`, 'detail');
+
+  if (images.length > 1) bindCarouselDots();
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -480,7 +654,7 @@ function handleKeywordSubmit(value, errEl, btn, input) {
     hideModal();
     setTimeout(() => {
       if (!localStorage.getItem(GH_PAT_KEY)) showTokenModal();
-      else showProjectFormModal();
+      else showProjectFormModal(null);
     }, 260);
     return;
   }
@@ -524,7 +698,7 @@ function showTokenModal() {
     if (!pat) { showError(errEl, 'Ingresá el token.'); return; }
     savePAT(pat);
     hideModal();
-    setTimeout(() => showProjectFormModal(), 260);
+    setTimeout(() => showProjectFormModal(null), 260);
   };
   btn.addEventListener('click', save);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
@@ -550,6 +724,7 @@ function activateEditorMode() {
   renderProjects(state.activeFilter);
   renderAbout();
   renderCertifications();
+  renderContact();
 }
 
 function deactivateEditorMode() {
@@ -558,65 +733,102 @@ function deactivateEditorMode() {
   renderProjects(state.activeFilter);
   renderAbout();
   renderCertifications();
+  renderContact();
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   MODAL NUEVO PROYECTO
+   MODAL PROYECTO (nuevo o editar — formulario unificado)
    ════════════════════════════════════════════════════════════════════ */
 
-function showProjectFormModal() {
+function showProjectFormModal(existingProject) {
   if (!isEditorActive()) { showKeywordModal(); return; }
+  const isEdit = !!existingProject;
+  const p      = existingProject || {};
+  const existingImages = getImages(p);
+
+  const existingImgsHTML = isEdit && existingImages.length > 0
+    ? `<div class="form-group">
+         <label class="form-label">Imágenes actuales <span class="hint">(× para quitar)</span></label>
+         <div class="current-imgs" id="pf-current-imgs">
+           ${existingImages.map((img, i) => `
+             <div class="current-img-item" data-img="${escHtml(img)}">
+               <img src="./${escHtml(img)}" class="current-img-thumb" alt="Imagen ${i + 1}" />
+               <button type="button" class="current-img-remove" aria-label="Quitar imagen">×</button>
+             </div>`).join('')}
+         </div>
+       </div>` : '';
+
   showModal(`
     <div class="modal-header">
-      <h3 class="modal-title">Nuevo proyecto</h3>
+      <h3 class="modal-title">${isEdit ? 'Editar proyecto' : 'Nuevo proyecto'}</h3>
       <button class="modal-close" onclick="hideModal()">×</button>
     </div>
     <div class="form-group">
       <label class="form-label" for="pf-title">Título <span class="req">*</span></label>
-      <input id="pf-title" type="text" class="form-input" placeholder="Mi proyecto" />
+      <input id="pf-title" type="text" class="form-input" placeholder="Mi proyecto" value="${escHtml(p.title || '')}" />
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label" for="pf-cat">Categoría <span class="req">*</span></label>
-        <input id="pf-cat" type="text" class="form-input" placeholder="Diseño" />
+        <input id="pf-cat" type="text" class="form-input" placeholder="Diseño" value="${escHtml(p.category || '')}" />
       </div>
       <div class="form-group">
         <label class="form-label" for="pf-date">Fecha</label>
-        <input id="pf-date" type="month" class="form-input" />
+        <input id="pf-date" type="month" class="form-input" value="${escHtml(p.date || '')}" />
       </div>
     </div>
     <div class="form-group">
       <label class="form-label" for="pf-desc">Descripción</label>
-      <textarea id="pf-desc" class="form-textarea" placeholder="Descripción breve…"></textarea>
+      <textarea id="pf-desc" class="form-textarea" placeholder="Descripción breve…">${escHtml(p.description || '')}</textarea>
     </div>
     <div class="form-group">
-      <label class="form-label" for="pf-tech">Tecnologías / medios <span class="hint">(separados por coma)</span></label>
-      <input id="pf-tech" type="text" class="form-input" placeholder="HTML, CSS, Figma" />
+      <label class="form-label" for="pf-tech">Tecnologías / medios <span class="hint">(separadas por coma)</span></label>
+      <input id="pf-tech" type="text" class="form-input" placeholder="HTML, CSS, Figma" value="${escHtml((p.technologies || []).join(', '))}" />
     </div>
+    ${existingImgsHTML}
     <div class="form-group">
-      <label class="form-label" for="pf-img">Imagen <span class="hint">(opcional)</span></label>
-      <input id="pf-img" type="file" class="form-file" accept="image/*" />
-      <div class="image-preview-wrap" id="img-preview-wrap" hidden>
-        <img id="img-preview" class="image-preview" alt="Vista previa" />
-      </div>
+      <label class="form-label" for="pf-imgs">${isEdit ? 'Agregar imágenes' : 'Imágenes'} <span class="hint">(podés elegir varias)</span></label>
+      <input id="pf-imgs" type="file" class="form-file" accept="image/*" multiple />
+      <div class="new-imgs-preview" id="pf-new-previews"></div>
     </div>
     <div id="pf-status" class="upload-status" hidden></div>
     <div id="pf-error"  class="form-error"    hidden></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
-      <button class="btn btn-primary" id="pf-submit">Publicar →</button>
+      <button class="btn btn-primary" id="pf-submit">${isEdit ? 'Guardar cambios →' : 'Publicar →'}</button>
     </div>`);
 
-  document.getElementById('pf-img').addEventListener('change', e => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      document.getElementById('img-preview').src = ev.target.result;
-      document.getElementById('img-preview-wrap').hidden = false;
-    };
-    reader.readAsDataURL(file);
+  // Quitar imágenes existentes
+  document.querySelectorAll('.current-img-remove').forEach(btn => {
+    btn.addEventListener('click', () => btn.closest('.current-img-item').remove());
   });
-  document.getElementById('pf-submit').addEventListener('click', submitNewProject);
+
+  // Preview imágenes nuevas
+  document.getElementById('pf-imgs').addEventListener('change', e => {
+    const wrap = document.getElementById('pf-new-previews');
+    wrap.innerHTML = '';
+    Array.from(e.target.files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const div = document.createElement('div');
+        div.className = 'new-img-preview-item';
+        div.innerHTML = `<img src="${ev.target.result}" class="new-img-thumb" alt="${escHtml(file.name)}" />`;
+        wrap.appendChild(div);
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  document.getElementById('pf-submit').addEventListener('click', () => {
+    if (isEdit) submitProjectEdit(p.id, existingImages);
+    else        submitNewProject();
+  });
+}
+
+function showProjectEditModal(projectId) {
+  const project = state.projects.find(p => p.id === projectId);
+  if (!project) return;
+  showProjectFormModal(project);
 }
 
 async function submitNewProject() {
@@ -626,7 +838,7 @@ async function submitNewProject() {
   const date     = document.getElementById('pf-date').value;
   const desc     = document.getElementById('pf-desc').value.trim();
   const tech     = document.getElementById('pf-tech').value.trim();
-  const imgFile  = document.getElementById('pf-img').files[0];
+  const imgFiles = Array.from(document.getElementById('pf-imgs').files);
   const errEl    = document.getElementById('pf-error');
   const statusEl = document.getElementById('pf-status');
   const submitBtn= document.getElementById('pf-submit');
@@ -645,17 +857,18 @@ async function submitNewProject() {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     title, category, date: date || null, description: desc,
     technologies: tech ? tech.split(',').map(t => t.trim()).filter(Boolean) : [],
-    image: null,
+    images: [],
   };
 
   try {
-    if (imgFile) {
-      setStatus('Subiendo imagen…');
-      const base64 = await readFileAsBase64(imgFile);
-      const ext    = imgFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
-      const fname  = `images/${project.id}.${ext}`;
+    for (let i = 0; i < imgFiles.length; i++) {
+      setStatus(`Subiendo imágenes (${i + 1}/${imgFiles.length})…`);
+      const file   = imgFiles[i];
+      const base64 = await readFileAsBase64(file);
+      const ext    = file.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+      const fname  = `images/${project.id}_${i}.${ext}`;
       await ghPutBinaryFile(fname, base64, null, `Add image: ${title}`, cfg);
-      project.image = fname;
+      project.images.push(fname);
     }
     setStatus('Guardando proyecto…');
     const existing = await ghGetFile('projects.json', cfg);
@@ -674,62 +887,173 @@ async function submitNewProject() {
   }
 }
 
+async function submitProjectEdit(projectId, originalImages) {
+  if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
+  const title    = document.getElementById('pf-title').value.trim();
+  const category = document.getElementById('pf-cat').value.trim();
+  const date     = document.getElementById('pf-date').value;
+  const desc     = document.getElementById('pf-desc').value.trim();
+  const tech     = document.getElementById('pf-tech').value.trim();
+  const imgFiles = Array.from(document.getElementById('pf-imgs').files);
+  const errEl    = document.getElementById('pf-error');
+  const statusEl = document.getElementById('pf-status');
+  const submitBtn= document.getElementById('pf-submit');
+
+  if (!title || !category) { showError(errEl, 'Título y categoría son obligatorios.'); return; }
+  const cfg = getGHConfig();
+  if (!cfg) { hideModal(); showTokenModal(); return; }
+
+  // Imágenes que siguen en el DOM (no fueron quitadas)
+  const keptImages = Array.from(document.querySelectorAll('#pf-current-imgs .current-img-item'))
+    .map(el => el.dataset.img).filter(Boolean);
+
+  submitBtn.disabled = true; errEl.hidden = true;
+  const setStatus = (msg, type = 'loading') => {
+    statusEl.className = `upload-status upload-status--${type}`;
+    statusEl.textContent = msg; statusEl.hidden = false;
+  };
+
+  try {
+    // Borrar imágenes quitadas de GitHub
+    const removedImages = originalImages.filter(img => !keptImages.includes(img));
+    for (const imgPath of removedImages) {
+      try {
+        const f = await ghGetFile(imgPath, cfg);
+        if (f) await ghDeleteFile(imgPath, f.sha, `Remove image: ${title}`, cfg);
+      } catch { /* continuar si ya no existe */ }
+    }
+
+    // Subir imágenes nuevas
+    const newImages = [...keptImages];
+    for (let i = 0; i < imgFiles.length; i++) {
+      setStatus(`Subiendo imágenes nuevas (${i + 1}/${imgFiles.length})…`);
+      const file   = imgFiles[i];
+      const base64 = await readFileAsBase64(file);
+      const ext    = file.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+      const fname  = `images/${projectId}_${Date.now()}_${i}.${ext}`;
+      await ghPutBinaryFile(fname, base64, null, `Update image: ${title}`, cfg);
+      newImages.push(fname);
+    }
+
+    setStatus('Guardando cambios…');
+    const existing = await ghGetFile('projects.json', cfg);
+    if (!existing) throw new Error('No se pudo leer projects.json');
+    const data = JSON.parse(existing.content);
+    const idx  = data.projects.findIndex(p => p.id === projectId);
+    if (idx === -1) throw new Error('Proyecto no encontrado');
+
+    const updated = {
+      ...data.projects[idx],
+      title, category, date: date || null, description: desc,
+      technologies: tech ? tech.split(',').map(t => t.trim()).filter(Boolean) : [],
+      images: newImages,
+    };
+    delete updated.image; // migrar campo viejo
+    data.projects[idx] = updated;
+
+    await ghPutTextFile('projects.json', JSON.stringify(data, null, 2), existing.sha, `Update project: ${title}`, cfg);
+    const stateIdx = state.projects.findIndex(p => p.id === projectId);
+    if (stateIdx !== -1) state.projects[stateIdx] = updated;
+    renderAll();
+    setStatus('¡Cambios guardados!', 'success');
+    setTimeout(hideModal, 1800);
+  } catch (err) {
+    setStatus(`Error: ${err.message}`, 'error');
+    submitBtn.disabled = false;
+  }
+}
+
 /* ════════════════════════════════════════════════════════════════════
-   MODAL NUEVA CERTIFICACIÓN
+   MODAL CERTIFICACIÓN (nueva o editar — formulario unificado)
    ════════════════════════════════════════════════════════════════════ */
 
-function showCertFormModal() {
+function showCertFormModal(existingCert) {
   if (!isEditorActive()) { showKeywordModal(); return; }
+  const isEdit = !!existingCert;
+  const c      = existingCert || {};
+  const existingImages = getImages(c);
+
+  const existingImgsHTML = isEdit && existingImages.length > 0
+    ? `<div class="form-group">
+         <label class="form-label">Imágenes actuales <span class="hint">(× para quitar)</span></label>
+         <div class="current-imgs" id="cf-current-imgs">
+           ${existingImages.map((img, i) => `
+             <div class="current-img-item" data-img="${escHtml(img)}">
+               <img src="./${escHtml(img)}" class="current-img-thumb" alt="Imagen ${i + 1}" />
+               <button type="button" class="current-img-remove" aria-label="Quitar imagen">×</button>
+             </div>`).join('')}
+         </div>
+       </div>` : '';
+
   showModal(`
     <div class="modal-header">
-      <h3 class="modal-title">Nueva certificación</h3>
+      <h3 class="modal-title">${isEdit ? 'Editar certificación' : 'Nueva certificación'}</h3>
       <button class="modal-close" onclick="hideModal()">×</button>
     </div>
     <div class="form-group">
       <label class="form-label" for="cf-title">Título <span class="req">*</span></label>
-      <input id="cf-title" type="text" class="form-input" placeholder="Nombre del curso o certificación" />
+      <input id="cf-title" type="text" class="form-input" placeholder="Nombre del curso o certificación" value="${escHtml(c.title || '')}" />
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label" for="cf-inst">Institución / Plataforma <span class="req">*</span></label>
-        <input id="cf-inst" type="text" class="form-input" placeholder="Udemy, Coursera…" />
+        <input id="cf-inst" type="text" class="form-input" placeholder="Udemy, Coursera…" value="${escHtml(c.institution || '')}" />
       </div>
       <div class="form-group">
         <label class="form-label" for="cf-date">Fecha</label>
-        <input id="cf-date" type="month" class="form-input" />
+        <input id="cf-date" type="month" class="form-input" value="${escHtml(c.date || '')}" />
       </div>
     </div>
     <div class="form-group">
       <label class="form-label" for="cf-desc">Descripción <span class="hint">(opcional)</span></label>
-      <textarea id="cf-desc" class="form-textarea" rows="3" placeholder="Breve descripción del curso…"></textarea>
+      <textarea id="cf-desc" class="form-textarea" rows="3" placeholder="Breve descripción del curso…">${escHtml(c.description || '')}</textarea>
     </div>
     <div class="form-group">
       <label class="form-label" for="cf-link">Link al certificado <span class="hint">(opcional)</span></label>
-      <input id="cf-link" type="url" class="form-input" placeholder="https://…" />
+      <input id="cf-link" type="url" class="form-input" placeholder="https://…" value="${escHtml(c.link || '')}" />
     </div>
+    ${existingImgsHTML}
     <div class="form-group">
-      <label class="form-label" for="cf-img">Imagen del diploma <span class="hint">(opcional)</span></label>
-      <input id="cf-img" type="file" class="form-file" accept="image/*" />
-      <div class="image-preview-wrap" id="cf-img-preview-wrap" hidden>
-        <img id="cf-img-preview" class="image-preview" alt="Vista previa" />
-      </div>
+      <label class="form-label" for="cf-imgs">${isEdit ? 'Agregar imágenes' : 'Imagen del diploma'} <span class="hint">(podés elegir varias)</span></label>
+      <input id="cf-imgs" type="file" class="form-file" accept="image/*" multiple />
+      <div class="new-imgs-preview" id="cf-new-previews"></div>
     </div>
     <div id="cf-status" class="upload-status" hidden></div>
     <div id="cf-error"  class="form-error"    hidden></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
-      <button class="btn btn-primary" id="cf-submit">Publicar →</button>
+      <button class="btn btn-primary" id="cf-submit">${isEdit ? 'Guardar cambios →' : 'Publicar →'}</button>
     </div>`);
-  document.getElementById('cf-img').addEventListener('change', e => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      document.getElementById('cf-img-preview').src = ev.target.result;
-      document.getElementById('cf-img-preview-wrap').hidden = false;
-    };
-    reader.readAsDataURL(file);
+
+  document.querySelectorAll('.current-img-remove').forEach(btn => {
+    btn.addEventListener('click', () => btn.closest('.current-img-item').remove());
   });
-  document.getElementById('cf-submit').addEventListener('click', submitNewCert);
+
+  document.getElementById('cf-imgs').addEventListener('change', e => {
+    const wrap = document.getElementById('cf-new-previews');
+    wrap.innerHTML = '';
+    Array.from(e.target.files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const div = document.createElement('div');
+        div.className = 'new-img-preview-item';
+        div.innerHTML = `<img src="${ev.target.result}" class="new-img-thumb" alt="${escHtml(file.name)}" />`;
+        wrap.appendChild(div);
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  document.getElementById('cf-submit').addEventListener('click', () => {
+    if (isEdit) submitCertEdit(c.id, existingImages);
+    else        submitNewCert();
+  });
+}
+
+function showCertEditModal(certId) {
+  const cert = state.certifications.find(c => c.id === certId);
+  if (!cert) return;
+  showCertFormModal(cert);
 }
 
 async function submitNewCert() {
@@ -739,7 +1063,7 @@ async function submitNewCert() {
   const date     = document.getElementById('cf-date').value;
   const desc     = document.getElementById('cf-desc').value.trim();
   const link     = document.getElementById('cf-link').value.trim();
-  const imgFile  = document.getElementById('cf-img').files[0];
+  const imgFiles = Array.from(document.getElementById('cf-imgs').files);
   const errEl    = document.getElementById('cf-error');
   const statusEl = document.getElementById('cf-status');
   const submitBtn= document.getElementById('cf-submit');
@@ -757,17 +1081,18 @@ async function submitNewCert() {
   const cert = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     title, institution: inst, date: date || null,
-    description: desc, link: link || null, image: null,
+    description: desc, link: link || null, images: [],
   };
 
   try {
-    if (imgFile) {
-      setStatus('Subiendo imagen…');
-      const base64 = await readFileAsBase64(imgFile);
-      const ext    = imgFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
-      const fname  = `images/cert_${cert.id}.${ext}`;
+    for (let i = 0; i < imgFiles.length; i++) {
+      setStatus(`Subiendo imágenes (${i + 1}/${imgFiles.length})…`);
+      const file   = imgFiles[i];
+      const base64 = await readFileAsBase64(file);
+      const ext    = file.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+      const fname  = `images/cert_${cert.id}_${i}.${ext}`;
       await ghPutBinaryFile(fname, base64, null, `Add cert image: ${title}`, cfg);
-      cert.image = fname;
+      cert.images.push(fname);
     }
     setStatus('Guardando…');
     const existing = await ghGetFile('certifications.json', cfg);
@@ -779,6 +1104,78 @@ async function submitNewCert() {
     state.certifications.push(cert);
     renderCertifications();
     setStatus('¡Certificación publicada!', 'success');
+    setTimeout(hideModal, 1800);
+  } catch (err) {
+    setStatus(`Error: ${err.message}`, 'error');
+    submitBtn.disabled = false;
+  }
+}
+
+async function submitCertEdit(certId, originalImages) {
+  if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
+  const title    = document.getElementById('cf-title').value.trim();
+  const inst     = document.getElementById('cf-inst').value.trim();
+  const date     = document.getElementById('cf-date').value;
+  const desc     = document.getElementById('cf-desc').value.trim();
+  const link     = document.getElementById('cf-link').value.trim();
+  const imgFiles = Array.from(document.getElementById('cf-imgs').files);
+  const errEl    = document.getElementById('cf-error');
+  const statusEl = document.getElementById('cf-status');
+  const submitBtn= document.getElementById('cf-submit');
+
+  if (!title || !inst) { showError(errEl, 'Título e institución son obligatorios.'); return; }
+  const cfg = getGHConfig();
+  if (!cfg) { hideModal(); showTokenModal(); return; }
+
+  const keptImages = Array.from(document.querySelectorAll('#cf-current-imgs .current-img-item'))
+    .map(el => el.dataset.img).filter(Boolean);
+
+  submitBtn.disabled = true; errEl.hidden = true;
+  const setStatus = (msg, type = 'loading') => {
+    statusEl.className = `upload-status upload-status--${type}`;
+    statusEl.textContent = msg; statusEl.hidden = false;
+  };
+
+  try {
+    const removedImages = originalImages.filter(img => !keptImages.includes(img));
+    for (const imgPath of removedImages) {
+      try {
+        const f = await ghGetFile(imgPath, cfg);
+        if (f) await ghDeleteFile(imgPath, f.sha, `Remove cert image: ${title}`, cfg);
+      } catch { /* continuar */ }
+    }
+
+    const newImages = [...keptImages];
+    for (let i = 0; i < imgFiles.length; i++) {
+      setStatus(`Subiendo imágenes nuevas (${i + 1}/${imgFiles.length})…`);
+      const file   = imgFiles[i];
+      const base64 = await readFileAsBase64(file);
+      const ext    = file.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+      const fname  = `images/cert_${certId}_${Date.now()}_${i}.${ext}`;
+      await ghPutBinaryFile(fname, base64, null, `Update cert image: ${title}`, cfg);
+      newImages.push(fname);
+    }
+
+    setStatus('Guardando cambios…');
+    const existing = await ghGetFile('certifications.json', cfg);
+    if (!existing) throw new Error('No se pudo leer certifications.json');
+    const data = JSON.parse(existing.content);
+    const idx  = data.certifications.findIndex(c => c.id === certId);
+    if (idx === -1) throw new Error('Certificación no encontrada');
+
+    const updated = {
+      ...data.certifications[idx],
+      title, institution: inst, date: date || null,
+      description: desc, link: link || null, images: newImages,
+    };
+    delete updated.image;
+    data.certifications[idx] = updated;
+
+    await ghPutTextFile('certifications.json', JSON.stringify(data, null, 2), existing.sha, `Update certification: ${title}`, cfg);
+    const stateIdx = state.certifications.findIndex(c => c.id === certId);
+    if (stateIdx !== -1) state.certifications[stateIdx] = updated;
+    renderCertifications();
+    setStatus('¡Cambios guardados!', 'success');
     setTimeout(hideModal, 1800);
   } catch (err) {
     setStatus(`Error: ${err.message}`, 'error');
@@ -855,6 +1252,81 @@ async function submitAboutEdit() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   MODAL EDITAR CONTACTO
+   ════════════════════════════════════════════════════════════════════ */
+
+function showContactEditModal() {
+  if (!isEditorActive()) return;
+  const { linkedin, whatsapp, email } = state.contact;
+  showModal(`
+    <div class="modal-header">
+      <h3 class="modal-title">Contacto</h3>
+      <button class="modal-close" onclick="hideModal()">×</button>
+    </div>
+    <p class="modal-sub">Dejá en blanco los que no quieras mostrar.</p>
+    <div class="form-group">
+      <label class="form-label" for="ct-linkedin">
+        <span class="contact-form-icon">${CONTACT_ICONS.linkedin}</span> LinkedIn <span class="hint">(URL completa)</span>
+      </label>
+      <input id="ct-linkedin" type="url" class="form-input" placeholder="https://linkedin.com/in/tu-perfil" value="${escHtml(linkedin)}" />
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="ct-whatsapp">
+        <span class="contact-form-icon">${CONTACT_ICONS.whatsapp}</span> WhatsApp <span class="hint">(con código de país, ej: 5491112345678)</span>
+      </label>
+      <input id="ct-whatsapp" type="text" class="form-input" placeholder="5491112345678" value="${escHtml(whatsapp)}" />
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="ct-email">
+        <span class="contact-form-icon">${CONTACT_ICONS.email}</span> Email
+      </label>
+      <input id="ct-email" type="email" class="form-input" placeholder="hola@ejemplo.com" value="${escHtml(email)}" />
+    </div>
+    <div id="ct-status" class="upload-status" hidden></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
+      <button class="btn btn-primary" id="ct-save">Guardar →</button>
+    </div>`);
+  document.getElementById('ct-save').addEventListener('click', submitContactEdit);
+}
+
+async function submitContactEdit() {
+  if (!isEditorActive()) { hideModal(); return; }
+  const linkedin = document.getElementById('ct-linkedin').value.trim();
+  const whatsapp = document.getElementById('ct-whatsapp').value.trim();
+  const email    = document.getElementById('ct-email').value.trim();
+  const statusEl = document.getElementById('ct-status');
+  const saveBtn  = document.getElementById('ct-save');
+  const cfg      = getGHConfig();
+  if (!cfg) { hideModal(); showTokenModal(); return; }
+
+  saveBtn.disabled = true;
+  const setStatus = (msg, type = 'loading') => {
+    statusEl.className = `upload-status upload-status--${type}`;
+    statusEl.textContent = msg; statusEl.hidden = false;
+  };
+
+  try {
+    setStatus('Guardando…');
+    const existing = await ghGetFile('contact.json', cfg);
+    await ghPutTextFile(
+      'contact.json',
+      JSON.stringify({ linkedin, whatsapp, email }, null, 2),
+      existing?.sha || null,
+      'Update contact',
+      cfg
+    );
+    state.contact = { linkedin, whatsapp, email };
+    renderContact();
+    setStatus('¡Guardado!', 'success');
+    setTimeout(hideModal, 1500);
+  } catch (err) {
+    setStatus(`Error: ${err.message}`, 'error');
+    saveBtn.disabled = false;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    DELETE PROYECTO / CERTIFICACIÓN
    ════════════════════════════════════════════════════════════════════ */
 
@@ -870,10 +1342,10 @@ async function deleteProject(projectId) {
     if (!existing) throw new Error('No se pudo leer projects.json');
     const data = JSON.parse(existing.content);
     data.projects = (data.projects || []).filter(p => p.id !== projectId);
-    if (project.image) {
+    for (const imgPath of getImages(project)) {
       try {
-        const imgFile = await ghGetFile(project.image, cfg);
-        if (imgFile) await ghDeleteFile(project.image, imgFile.sha, `Remove image: ${project.title}`, cfg);
+        const f = await ghGetFile(imgPath, cfg);
+        if (f) await ghDeleteFile(imgPath, f.sha, `Remove image: ${project.title}`, cfg);
       } catch { /* ignorar si falla */ }
     }
     await ghPutTextFile('projects.json', JSON.stringify(data, null, 2), existing.sha, `Remove project: ${project.title}`, cfg);
@@ -897,10 +1369,10 @@ async function deleteCert(certId) {
     if (!existing) throw new Error('No se pudo leer certifications.json');
     const data = JSON.parse(existing.content);
     data.certifications = (data.certifications || []).filter(c => c.id !== certId);
-    if (cert.image) {
+    for (const imgPath of getImages(cert)) {
       try {
-        const imgFile = await ghGetFile(cert.image, cfg);
-        if (imgFile) await ghDeleteFile(cert.image, imgFile.sha, `Remove cert image: ${cert.title}`, cfg);
+        const f = await ghGetFile(imgPath, cfg);
+        if (f) await ghDeleteFile(imgPath, f.sha, `Remove cert image: ${cert.title}`, cfg);
       } catch { /* ignorar si falla */ }
     }
     await ghPutTextFile('certifications.json', JSON.stringify(data, null, 2), existing.sha, `Remove certification: ${cert.title}`, cfg);
@@ -967,28 +1439,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   const yr = new Date().getFullYear();
   document.querySelectorAll('#current-year, #footer-year').forEach(el => { el.textContent = yr; });
 
-  await Promise.all([loadProjects(), loadAbout(), loadCertifications()]);
+  await Promise.all([loadProjects(), loadAbout(), loadCertifications(), loadContact()]);
 
   renderAll();
   renderAbout();
   renderCertifications();
+  renderContact();
 
   if (isEditorActive()) activateEditorMode();
 
   document.getElementById('fab-add').addEventListener('click', () => {
-    if (isEditorActive()) showProjectFormModal();
+    if (isEditorActive()) showProjectFormModal(null);
     else                  showKeywordModal();
   });
 
   // Abrir detalle al hacer click en una tarjeta (excluir botones de acción)
   document.getElementById('projects-grid').addEventListener('click', e => {
-    if (e.target.closest('.card-delete-btn, .card-confirm-overlay')) return;
+    if (e.target.closest('.card-delete-btn, .card-edit-btn, .card-confirm-overlay')) return;
     const card = e.target.closest('.project-card');
     if (card) showProjectDetailModal(card.dataset.id);
   });
 
   document.getElementById('certs-section').addEventListener('click', e => {
-    if (e.target.closest('.cert-delete-btn, .card-confirm-overlay, .add-cert-btn, button')) return;
+    if (e.target.closest('.cert-delete-btn, .cert-edit-btn, .card-confirm-overlay, .add-cert-btn, button')) return;
     const card = e.target.closest('.cert-card');
     if (card) showCertDetailModal(card.dataset.id);
   });
