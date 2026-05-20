@@ -16,6 +16,15 @@
       "description": "",
       "link": null,
       "image": "images/cert_mpe7c1xy7wxu.png"
+    },
+    {
+      "id": "mpe7pr4ep1v0",
+      "title": "Google Ads",
+      "institution": "Google",
+      "date": "2026-06",
+      "description": "Esto es un texto de prueba que habla acerca de la certificacion que hice de google para ver si esta bien y funciona todo como corresponde",
+      "link": "google.com",
+      "image": "images/cert_mpe7pr4ep1v0.jpg"
     }
   ]
 }
