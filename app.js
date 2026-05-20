@@ -68,10 +68,10 @@ function ghHeaders(pat) {
 }
 
 async function ghGetFile(path, cfg) {
+  // &_ timestamp busts the browser cache without needing Cache-Control headers
+  // (Cache-Control/Pragma trigger CORS preflight failures on GitHub API)
   const url = `${GH_API}/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${cfg.branch}&_=${Date.now()}`;
-  const res = await fetch(url, {
-    headers: { ...ghHeaders(cfg.pat), 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
-  });
+  const res = await fetch(url, { headers: ghHeaders(cfg.pat) });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`GitHub ${res.status}: ${res.statusText}`);
   const data = await res.json();
