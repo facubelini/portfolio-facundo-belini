@@ -1,0 +1,22 @@
+{
+  "projects": [
+    {
+      "id": "sample01",
+      "title": "Identidad visual para estudio de arquitectura",
+      "category": "Diseño",
+      "date": "2024-03",
+      "description": "Sistema de identidad completo para un estudio de arquitectura boutique. Incluye logotipo, tipografía, paleta de color y aplicaciones en papelería y digital.",
+      "technologies": ["Figma", "Illustrator", "Tipografía variable"],
+      "image": null
+    },
+    {
+      "id": "sample02",
+      "title": "App de seguimiento de hábitos",
+      "category": "Desarrollo",
+      "date": "2024-06",
+      "description": "Aplicación web progresiva para registro y visualización de hábitos diarios. Diseño con enfoque en fricción mínima e interfaz limpia.",
+      "technologies": ["JavaScript", "IndexedDB", "CSS Grid", "PWA"],
+      "image": null
+    }
+  ]
+}
