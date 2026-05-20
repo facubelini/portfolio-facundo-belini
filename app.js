@@ -1364,7 +1364,7 @@ async function submitContactEdit() {
       cfg
     );
     state.contact = { linkedin, whatsapp, email };
-    renderContact();
+    renderContactHeader();
     setStatus('¡Guardado!', 'success');
     setTimeout(hideModal, 1500);
   } catch (err) {
