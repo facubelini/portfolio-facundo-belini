@@ -3,20 +3,38 @@
     {
       "id": "sample01",
       "title": "Identidad visual para estudio de arquitectura",
-      "category": "Diseño",
+      "category": "DiseÃ±o",
       "date": "2024-03",
-      "description": "Sistema de identidad completo para un estudio de arquitectura boutique. Incluye logotipo, tipografía, paleta de color y aplicaciones en papelería y digital.",
-      "technologies": ["Figma", "Illustrator", "Tipografía variable"],
+      "description": "Sistema de identidad completo para un estudio de arquitectura boutique. Incluye logotipo, tipografÃ­a, paleta de color y aplicaciones en papelerÃ­a y digital.",
+      "technologies": [
+        "Figma",
+        "Illustrator",
+        "TipografÃ­a variable"
+      ],
       "image": null
     },
     {
       "id": "sample02",
-      "title": "App de seguimiento de hábitos",
+      "title": "App de seguimiento de hÃ¡bitos",
       "category": "Desarrollo",
       "date": "2024-06",
-      "description": "Aplicación web progresiva para registro y visualización de hábitos diarios. Diseño con enfoque en fricción mínima e interfaz limpia.",
-      "technologies": ["JavaScript", "IndexedDB", "CSS Grid", "PWA"],
+      "description": "AplicaciÃ³n web progresiva para registro y visualizaciÃ³n de hÃ¡bitos diarios. DiseÃ±o con enfoque en fricciÃ³n mÃ­nima e interfaz limpia.",
+      "technologies": [
+        "JavaScript",
+        "IndexedDB",
+        "CSS Grid",
+        "PWA"
+      ],
       "image": null
+    },
+    {
+      "id": "mpe51jegrnv3",
+      "title": "dsdsads",
+      "category": "weqweq",
+      "date": null,
+      "description": "",
+      "technologies": [],
+      "image": "images/mpe51jegrnv3.jpeg"
     }
   ]
 }
