@@ -3,13 +3,13 @@
     {
       "id": "sample01",
       "title": "Identidad visual para estudio de arquitectura",
-      "category": "DiseÃÂÃÂÃÂÃÂ±o",
+      "category": "DiseÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±o",
       "date": "2024-03",
-      "description": "Sistema de identidad completo para un estudio de arquitectura boutique. Incluye logotipo, tipografÃÂÃÂÃÂÃÂ­a, paleta de color y aplicaciones en papelerÃÂÃÂÃÂÃÂ­a y digital.",
+      "description": "Sistema de identidad completo para un estudio de arquitectura boutique. Incluye logotipo, tipografÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­a, paleta de color y aplicaciones en papelerÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­a y digital.",
       "technologies": [
         "Figma",
         "Illustrator",
-        "TipografÃÂÃÂÃÂÃÂ­a variable"
+        "TipografÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­a variable"
       ],
       "image": null
     },
@@ -43,6 +43,17 @@
         "IA"
       ],
       "image": "images/mpe67aglao4m.png"
+    },
+    {
+      "id": "mpe68oecx59s",
+      "title": "Test",
+      "category": "Marketing",
+      "date": null,
+      "description": "",
+      "technologies": [
+        "Meta Ads"
+      ],
+      "image": "images/mpe68oecx59s.png"
     }
   ]
 }
