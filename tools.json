@@ -184,6 +184,11 @@
       "id": "mpevbzl0ww3s",
       "name": "Claude",
       "image": "images/tool_mpevbzl0ww3s.svg"
+    },
+    {
+      "id": "mpevdcod19hz",
+      "name": "Chat GPT",
+      "image": "images/tool_mpevdcod19hz.png"
     }
   ]
 }
