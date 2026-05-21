@@ -194,6 +194,11 @@
       "id": "mpevdxy1dvti",
       "name": "Gemini",
       "image": "images/tool_mpevdxy1dvti.png"
+    },
+    {
+      "id": "mpevget5oqks",
+      "name": "Copilot",
+      "image": "images/tool_mpevget5oqks.png"
     }
   ]
 }
