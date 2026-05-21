@@ -199,6 +199,12 @@
       "id": "mpevget5oqks",
       "name": "Copilot",
       "image": "images/tool_mpevget5oqks.png"
+    },
+    {
+      "id": "mpfx81uru5bu",
+      "name": "Enlyft",
+      "category": null,
+      "image": "images/tool_mpfx81uru5bu.svg"
     }
   ]
 }
