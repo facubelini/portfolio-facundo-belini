@@ -1,3 +1,9 @@
 {
-  "tools": []
+  "tools": [
+    {
+      "id": "mpeuchasjedr",
+      "name": "Google Ads",
+      "image": "images/tool_mpeuchasjedr.png"
+    }
+  ]
 }
