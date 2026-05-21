@@ -189,6 +189,11 @@
       "id": "mpevdcod19hz",
       "name": "Chat GPT",
       "image": "images/tool_mpevdcod19hz.png"
+    },
+    {
+      "id": "mpevdxy1dvti",
+      "name": "Gemini",
+      "image": "images/tool_mpevdxy1dvti.png"
     }
   ]
 }
