@@ -179,6 +179,11 @@
       "id": "mpevbdv07pa6",
       "name": "Glide",
       "image": "images/tool_mpevbdv07pa6.png"
+    },
+    {
+      "id": "mpevbzl0ww3s",
+      "name": "Claude",
+      "image": "images/tool_mpevbzl0ww3s.svg"
     }
   ]
 }
