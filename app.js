@@ -32,9 +32,11 @@ const state = {
   about:            { bio: '', role: '' },
   contact:          { linkedin: '', whatsapp: '', email: '' },
   hero:             { line1: 'Trabajo', line2: 'seleccionado.', sub: 'Diseño y desarrollo.' },
+  profile:          { image: null },
   layout:           { projectCols: 3, certCols: 4 },
   activeFilter:     'Todos',
   activeCertFilter: 'Todos',
+  activeToolFilter: 'Todos',
   failedAttempts:   0,
   lockoutUntil:     null,
 };
@@ -249,6 +251,15 @@ async function saveLayout() {
       cfg
     );
   } catch { /* silently ignore */ }
+}
+
+async function loadProfile() {
+  try {
+    const res = await fetch(`./profile.json?t=${Date.now()}`);
+    if (!res.ok) throw new Error();
+    const d = await res.json();
+    state.profile = { image: d.image || null };
+  } catch { state.profile = { image: null }; }
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -632,6 +643,40 @@ function renderContactHeader() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   RENDER — FOTO DE PERFIL (header)
+   ════════════════════════════════════════════════════════════════════ */
+
+function renderProfileHeader() {
+  const wrap = document.getElementById('profile-header-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+
+  const { image } = state.profile;
+  if (!image && !isEditorActive()) return;
+
+  const avatar = document.createElement('div');
+  avatar.className = 'header-avatar';
+
+  if (image) {
+    avatar.innerHTML = `<img src="./${escHtml(image)}" alt="Foto de perfil" class="header-avatar-img" />`;
+  } else {
+    avatar.innerHTML = `<span class="header-avatar-placeholder">FB</span>`;
+  }
+
+  if (isEditorActive()) {
+    avatar.classList.add('header-avatar--editable');
+    avatar.title = image ? 'Cambiar foto de perfil' : 'Agregar foto de perfil';
+    avatar.addEventListener('click', showProfileEditModal);
+    const ov = document.createElement('div');
+    ov.className = 'header-avatar-edit-overlay';
+    ov.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    avatar.appendChild(ov);
+  }
+
+  wrap.appendChild(avatar);
+}
+
+/* ════════════════════════════════════════════════════════════════════
    RENDER — SERVICIOS
    ════════════════════════════════════════════════════════════════════ */
 
@@ -727,18 +772,43 @@ function renderTools() {
          Agregar
        </button>` : '';
 
-  const toolsHTML = state.tools.length > 0
-    ? `<div class="tools-grid">${state.tools.map((t, i) => buildToolCardHTML(t, i)).join('')}</div>`
-    : `<div class="certs-empty">No hay herramientas todavía.</div>`;
+  // Categorías únicas de herramientas
+  const toolCats = ['Todos', ...new Set(state.tools.map(t => t.category).filter(Boolean))];
+  const hasCats  = toolCats.length > 1;
+
+  const toolFilterHTML = hasCats
+    ? `<div class="cert-filters" id="tool-filters-container">
+         ${toolCats.map(cat =>
+             `<button class="filter-btn tool-filter-btn${cat === state.activeToolFilter ? ' active' : ''}" data-cat="${escHtml(cat)}">${escHtml(cat)}</button>`
+           ).join('')}
+       </div>` : '';
+
+  // Filtrar herramientas
+  const filtered = state.activeToolFilter === 'Todos'
+    ? state.tools
+    : state.tools.filter(t => t.category === state.activeToolFilter);
+
+  const toolsHTML = filtered.length > 0
+    ? `<div class="tools-grid">${filtered.map((t, i) => buildToolCardHTML(t, i)).join('')}</div>`
+    : `<div class="certs-empty">${state.tools.length === 0 ? 'No hay herramientas todavía.' : 'No hay herramientas en esta categoría.'}</div>`;
 
   section.innerHTML = `
     <div class="section-header">
       <h2 class="section-title">Herramientas</h2>
       ${addBtn}
     </div>
+    ${toolFilterHTML}
     ${toolsHTML}`;
 
   document.getElementById('add-tool-btn')?.addEventListener('click', () => showToolFormModal(null));
+
+  // Tool filter buttons
+  section.querySelectorAll('.tool-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.activeToolFilter = btn.dataset.cat;
+      renderTools();
+    });
+  });
 
   if (isEditorActive()) {
     section.querySelectorAll('.tool-delete-btn').forEach(btn => {
@@ -760,11 +830,13 @@ function buildToolCardHTML(tool, idx) {
     ? `<button class="tool-edit-btn" data-id="${id}" aria-label="Editar" title="Editar">
          <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
        </button>` : '';
+  const catEl = tool.category ? `<span class="tool-category">${escHtml(tool.category)}</span>` : '';
   return `
     <div class="tool-card" data-id="${id}" style="--card-i:${idx}">
       ${editBtn}${delBtn}
       <div class="tool-img-wrap">${imgEl}</div>
       <span class="tool-name">${escHtml(tool.name)}</span>
+      ${catEl}
     </div>`.trim();
 }
 
@@ -1039,6 +1111,7 @@ function activateEditorMode() {
   renderTools();
   renderCertifications();
   renderContactHeader();
+  renderProfileHeader();
 }
 
 function deactivateEditorMode() {
@@ -1051,6 +1124,7 @@ function deactivateEditorMode() {
   renderTools();
   renderCertifications();
   renderContactHeader();
+  renderProfileHeader();
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -1718,6 +1792,116 @@ async function submitHeroEdit() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   MODAL FOTO DE PERFIL
+   ════════════════════════════════════════════════════════════════════ */
+
+function showProfileEditModal() {
+  if (!isEditorActive()) return;
+  const { image } = state.profile;
+
+  const existingImgHTML = image
+    ? `<div class="form-group">
+         <label class="form-label">Foto actual <span class="hint">(× para quitar)</span></label>
+         <div class="current-imgs" id="pp-current">
+           <div class="current-img-item" data-img="${escHtml(image)}">
+             <img src="./${escHtml(image)}" class="current-img-thumb" style="border-radius:50%;" alt="Foto de perfil" />
+             <button type="button" class="current-img-remove" aria-label="Quitar">×</button>
+           </div>
+         </div>
+       </div>` : '';
+
+  showModal(`
+    <div class="modal-header">
+      <h3 class="modal-title">Foto de perfil</h3>
+      <button class="modal-close" onclick="hideModal()">×</button>
+    </div>
+    <p class="modal-sub">Aparece en el header junto a tu nombre.</p>
+    ${existingImgHTML}
+    <div class="form-group">
+      <label class="form-label" for="pp-img">Nueva foto <span class="hint">(cuadrada recomendada)</span></label>
+      <input id="pp-img" type="file" class="form-file" accept="image/*" />
+      <div class="new-imgs-preview" id="pp-preview"></div>
+    </div>
+    <div id="pp-status" class="upload-status" hidden></div>
+    <div id="pp-error"  class="form-error"    hidden></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
+      <button class="btn btn-primary" id="pp-submit">Guardar →</button>
+    </div>`);
+
+  document.querySelector('#pp-current .current-img-remove')?.addEventListener('click', e => {
+    e.target.closest('.current-img-item').remove();
+  });
+  document.getElementById('pp-img').addEventListener('change', e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('pp-preview').innerHTML =
+        `<div class="new-img-preview-item"><img src="${ev.target.result}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;" alt="Preview" /></div>`;
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('pp-submit').addEventListener('click', () => submitProfileEdit(image));
+}
+
+async function submitProfileEdit(originalImage) {
+  if (!isEditorActive()) { hideModal(); return; }
+  const imgFile   = document.getElementById('pp-img').files[0];
+  const keptImage = document.querySelector('#pp-current .current-img-item')?.dataset.img || null;
+  const statusEl  = document.getElementById('pp-status');
+  const btn       = document.getElementById('pp-submit');
+  const cfg       = getGHConfig(); if (!cfg) { hideModal(); showTokenModal(); return; }
+
+  btn.disabled = true;
+  const setStatus = (msg, type = 'loading') => {
+    statusEl.className = `upload-status upload-status--${type}`;
+    statusEl.textContent = msg; statusEl.hidden = false;
+  };
+
+  try {
+    let newImage = keptImage;
+
+    // Borrar foto anterior si se quitó y no hay nueva
+    if (originalImage && !keptImage && !imgFile) {
+      setStatus('Eliminando foto anterior…');
+      try {
+        const f = await ghGetFile(originalImage, cfg);
+        if (f) await ghDeleteFile(originalImage, f.sha, 'Remove profile photo', cfg);
+      } catch {}
+      newImage = null;
+    }
+
+    // Subir nueva foto
+    if (imgFile) {
+      setStatus('Subiendo foto…');
+      const base64 = await readFileAsBase64(imgFile);
+      const ext    = imgFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+      const fname  = `images/profile.${ext}`;
+      const existingImg = await ghGetFile(fname, cfg);
+      await ghPutBinaryFile(fname, base64, existingImg?.sha || null, 'Update profile photo', cfg);
+      newImage = fname;
+    }
+
+    setStatus('Guardando…');
+    const existing = await ghGetFile('profile.json', cfg);
+    await ghPutTextFile(
+      'profile.json',
+      JSON.stringify({ image: newImage }, null, 2),
+      existing?.sha || null,
+      'Update profile photo',
+      cfg
+    );
+    state.profile = { image: newImage };
+    renderProfileHeader();
+    setStatus('¡Guardado!', 'success');
+    setTimeout(hideModal, 1500);
+  } catch (err) {
+    setStatus(`Error: ${err.message}`, 'error');
+    btn.disabled = false;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    MODAL SERVICIO (nuevo o editar)
    ════════════════════════════════════════════════════════════════════ */
 
@@ -1907,6 +2091,10 @@ function showToolFormModal(existingTool) {
       <label class="form-label" for="tl-name">Nombre <span class="req">*</span></label>
       <input id="tl-name" type="text" class="form-input" placeholder="Figma" value="${escHtml(t.name || '')}" />
     </div>
+    <div class="form-group">
+      <label class="form-label" for="tl-cat">Categoría <span class="hint">(opcional — sirve para filtrar)</span></label>
+      <input id="tl-cat" type="text" class="form-input" placeholder="Diseño, Desarrollo, Marketing…" value="${escHtml(t.category || '')}" />
+    </div>
     ${existingImgHTML}
     <div class="form-group">
       <label class="form-label" for="tl-img">Logo <span class="hint">(opcional — PNG transparente recomendado)</span></label>
@@ -1946,8 +2134,9 @@ function showToolEditModal(toolId) {
 
 async function submitNewTool() {
   if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
-  const name    = document.getElementById('tl-name').value.trim();
-  const imgFile = document.getElementById('tl-img').files[0];
+  const name     = document.getElementById('tl-name').value.trim();
+  const category = document.getElementById('tl-cat').value.trim();
+  const imgFile  = document.getElementById('tl-img').files[0];
   const errEl   = document.getElementById('tl-error');
   const statusEl= document.getElementById('tl-status');
   const btn     = document.getElementById('tl-submit');
@@ -1960,7 +2149,7 @@ async function submitNewTool() {
 
   const tool = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    name, image: null,
+    name, category: category || null, image: null,
   };
 
   try {
@@ -1988,8 +2177,9 @@ async function submitNewTool() {
 
 async function submitToolEdit(toolId, originalImage) {
   if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
-  const name    = document.getElementById('tl-name').value.trim();
-  const imgFile = document.getElementById('tl-img').files[0];
+  const name     = document.getElementById('tl-name').value.trim();
+  const category = document.getElementById('tl-cat').value.trim();
+  const imgFile  = document.getElementById('tl-img').files[0];
   const errEl   = document.getElementById('tl-error');
   const statusEl= document.getElementById('tl-status');
   const btn     = document.getElementById('tl-submit');
@@ -2021,7 +2211,7 @@ async function submitToolEdit(toolId, originalImage) {
     const data = JSON.parse(existing.content);
     const idx  = data.tools.findIndex(t => t.id === toolId);
     if (idx === -1) throw new Error('Herramienta no encontrada');
-    const updated = { ...data.tools[idx], name, image: newImage };
+    const updated = { ...data.tools[idx], name, category: category || null, image: newImage };
     data.tools[idx] = updated;
     await ghPutTextFile('tools.json', JSON.stringify(data, null, 2), existing.sha, `Update tool: ${name}`, cfg);
     const ti = state.tools.findIndex(t => t.id === toolId);
@@ -2187,7 +2377,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const yr = new Date().getFullYear();
   document.querySelectorAll('#current-year, #footer-year').forEach(el => { el.textContent = yr; });
 
-  await Promise.all([loadProjects(), loadAbout(), loadCertifications(), loadContact(), loadHero(), loadServices(), loadTools(), loadLayout()]);
+  await Promise.all([loadProjects(), loadAbout(), loadCertifications(), loadContact(), loadHero(), loadServices(), loadTools(), loadLayout(), loadProfile()]);
 
   renderHero();
   renderAll();
@@ -2197,6 +2387,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderTools();
   renderCertifications();
   renderContactHeader();
+  renderProfileHeader();
 
   if (isEditorActive()) activateEditorMode();
 

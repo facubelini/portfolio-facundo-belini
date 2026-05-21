@@ -82,11 +82,63 @@ button { cursor: pointer; font-family: inherit; }
 }
 .site-name:hover { color: var(--accent); }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .header-right {
   display: flex;
   align-items: center;
   gap: 1.25rem;
 }
+
+/* ── Header avatar (foto de perfil) ─────────────────────────────── */
+.header-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+  background: var(--bg-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s;
+  position: relative;
+}
+.header-avatar--editable { cursor: pointer; }
+.header-avatar--editable:hover { border-color: var(--fg); }
+.header-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.header-avatar-placeholder {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+  line-height: 1;
+  user-select: none;
+}
+.header-avatar-edit-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 17, 16, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.15s;
+  color: #fff;
+}
+.header-avatar--editable:hover .header-avatar-edit-overlay { opacity: 1; }
 
 .site-year {
   font-family: var(--font-body);
@@ -1102,6 +1154,18 @@ button { cursor: pointer; font-family: inherit; }
 }
 .cert-card:hover .cert-edit-btn { opacity: 1; }
 .cert-edit-btn:hover { background: var(--accent-dark); }
+
+/* ── Tool category badge ─────────────────────────────────────────── */
+.tool-category {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin-top: 0.2rem;
+  text-align: center;
+}
 
 /* ── Cert category badge ─────────────────────────────────────────── */
 .cert-category {
