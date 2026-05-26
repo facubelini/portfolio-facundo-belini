@@ -7,7 +7,10 @@
       "date": "2026-05",
       "description": "ID de credencial: r2qe74h973oh",
       "link": "https://verify.skilljar.com/c/r2qe74h973oh",
-      "image": "images/cert_mpe89j831fxh.png"
+      "category": "IA",
+      "images": [
+        "images/cert_mpe89j831fxh.png"
+      ]
     },
     {
       "id": "mpeji27dqzp4",
