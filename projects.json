@@ -1,17 +1,6 @@
 {
   "projects": [
     {
-      "id": "mpe67aglao4m",
-      "title": "Ai Fluency",
-      "category": "Antrhopic",
-      "date": null,
-      "description": "",
-      "technologies": [
-        "IA"
-      ],
-      "image": "images/mpe67aglao4m.png"
-    },
-    {
       "id": "mpqfw8kwboiw",
       "title": "Pendiente de carga",
       "category": "Test",
