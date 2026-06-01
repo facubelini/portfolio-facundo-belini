@@ -191,6 +191,17 @@
       "images": [
         "images/mpvv1am17ha7_0.png"
       ]
+    },
+    {
+      "id": "mpvv3em9svtf",
+      "title": "BostonCred",
+      "category": "Digitalización de empresas",
+      "date": null,
+      "description": "Creé una app para gestionar el stock de la empresa. Dentro de sus funciones, permite tener una base de datos con el registro de cada uno de los ítems, gestionar proveedores, tener estadísticas del stock y alertas de cuando se necesita una reposición del mismo.",
+      "technologies": [],
+      "images": [
+        "images/mpvv3em9svtf_0.png"
+      ]
     }
   ]
 }
