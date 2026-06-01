@@ -154,7 +154,9 @@
       "category": "Diseño web",
       "date": null,
       "description": "Diseñe esta web por pedido de CC Music, productora que representa al artista. El objetivo era tener una landing en la cual puedan conocerse las fechas en las que se presenta el DJ, sumado a las redes sociales y canales para contratarlo.",
-      "technologies": [],
+      "technologies": [
+        "Celebridades"
+      ],
       "images": [
         "images/mpvuu3ttw607_0.png"
       ]
