@@ -180,6 +180,17 @@
       "images": [
         "images/mpvuy7fl3j82_0.png"
       ]
+    },
+    {
+      "id": "mpvv1am17ha7",
+      "title": "Traumatología Infantil Neuquén",
+      "category": "Digitalización de empresas",
+      "date": null,
+      "description": "Creé una app por la cual pueden enviar presupuestos de manera automática a sus pacientes. Dentro de sus funciones, permite tener una base de datos con el registro de cada uno de ellos, también pueden consultar estadísticas generales de sus pacientes y del negocio.",
+      "technologies": [],
+      "images": [
+        "images/mpvv1am17ha7_0.png"
+      ]
     }
   ]
 }
