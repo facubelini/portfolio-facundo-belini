@@ -66,7 +66,9 @@
       "category": "Meta Ads",
       "date": null,
       "description": "El cliente me pidió que además de implementar las campañas, le haga los diseños de los anuncios. Me transmitió la necesidad de que sea algo colorido y que llame mucho la atención.",
-      "technologies": [],
+      "technologies": [
+        "Local de comidas"
+      ],
       "images": [
         "images/mpvua4c4txfm_0.png"
       ]
