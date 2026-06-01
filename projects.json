@@ -121,7 +121,9 @@
       "category": "Diseño web",
       "date": null,
       "description": "El cliente me dijo que quería una web que pueda transmitir profesionalismo, pero a la vez sea descontracturada. Quería comunicar todos sus servicios y qué incluía cada uno.",
-      "technologies": [],
+      "technologies": [
+        "Abogados"
+      ],
       "images": [
         "images/mpvunh4keo5u_0.png"
       ]
