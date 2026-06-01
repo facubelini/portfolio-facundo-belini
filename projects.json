@@ -125,6 +125,17 @@
       "images": [
         "images/mpvunh4keo5u_0.png"
       ]
+    },
+    {
+      "id": "mpvuq2dsk6c8",
+      "title": "WVC",
+      "category": "Diseño web",
+      "date": null,
+      "description": "El cliente quería una web simple que muestre los servicios que ofrece, quería algo muy sencillo, sin mucho diseño.",
+      "technologies": [],
+      "images": [
+        "images/mpvuq2dsk6c8_0.png"
+      ]
     }
   ]
 }
