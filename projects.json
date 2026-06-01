@@ -77,7 +77,9 @@
       "category": "Meta Ads",
       "date": null,
       "description": "El cliente me pidió que además de implementar las campañas, le haga los diseños de los anuncios. Me transmitió la necesidad transmitir la calidad y calidez de sus productos, sumado a los beneficios que ofrecía.",
-      "technologies": [],
+      "technologies": [
+        "Muebles de diseño"
+      ],
       "images": [
         "images/mpvucg50scx5_0.png"
       ]
