@@ -165,7 +165,9 @@
       "category": "Diseño web",
       "date": null,
       "description": "El cliente quería una web onepage que le permita resumir todos los servicios que ofrece, sumado a la experiencia que tiene y a las marcas con las que ha trabajado.",
-      "technologies": [],
+      "technologies": [
+        "Servicios profesionales"
+      ],
       "images": [
         "images/mpvuvzu0p30l_0.png"
       ]
