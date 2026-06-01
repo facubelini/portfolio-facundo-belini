@@ -110,7 +110,9 @@
       "category": "Meta Ads",
       "date": null,
       "description": "El cliente me pidió que además de implementar las campañas, le haga los diseños de los anuncios. Me pidió que haga diseños que resalten los productos y las ofertas especiales que tenia, quería algo \"alegre y llamativo\"",
-      "technologies": [],
+      "technologies": [
+        "Venta de productos"
+      ],
       "images": [
         "images/mpvujknlhdc6_0.png"
       ]
