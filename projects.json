@@ -176,7 +176,9 @@
       "category": "Diseño web",
       "date": null,
       "description": "El cliente me pidió una web onepage para resumir todos sus servicios, quería algo simple sin mucho mantenimiento y que posicione bien con SEO.",
-      "technologies": [],
+      "technologies": [
+        "Servicios profesionales"
+      ],
       "images": [
         "images/mpvuy7fl3j82_0.png"
       ]
