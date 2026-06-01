@@ -132,7 +132,9 @@
       "category": "Diseño web",
       "date": null,
       "description": "El cliente quería una web simple que muestre los servicios que ofrece, quería algo muy sencillo, sin mucho diseño.",
-      "technologies": [],
+      "technologies": [
+        "Servicios profesionales"
+      ],
       "images": [
         "images/mpvuq2dsk6c8_0.png"
       ]
