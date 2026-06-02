@@ -30,7 +30,9 @@
       "category": "Redes Sociales",
       "date": null,
       "description": "Éstos son algunos ejemplos del contenido que hice para esta marca, todos los diseños se hicieron en base a la estética que solicitó el cliente.",
-      "technologies": [],
+      "technologies": [
+        "Médicos"
+      ],
       "images": [
         "images/mpvu32n1ofl0_0.png",
         "images/mpvu32n1ofl0_1.png"
