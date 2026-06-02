@@ -23,6 +23,12 @@
       "title": "Email Marketing",
       "description": "Creo campañas de email marketing enfocadas en comunicar, fidelizar y convertir contactos en clientes.",
       "image": "images/service_mpvzxcgiwoui.jpg"
+    },
+    {
+      "id": "mpvzyv4rl5ru",
+      "title": "Diseño web",
+      "description": "Desarrollo sitios web modernos, funcionales y pensados para mejorar la experiencia del usuario.",
+      "image": "images/service_mpvzyv4rl5ru.jpg"
     }
   ]
 }
