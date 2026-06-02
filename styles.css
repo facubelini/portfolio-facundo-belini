@@ -1513,70 +1513,64 @@ button { cursor: pointer; font-family: inherit; }
 }
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  gap: 1rem;
 }
 .service-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   position: relative;
   cursor: default;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   animation: fadeUp 0.4s ease both;
   animation-delay: calc(var(--card-i, 0) * 60ms);
-  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
 }
 .service-card:hover {
   transform: translateY(-4px);
   box-shadow: var(--shadow-md);
-  border-color: var(--fg);
 }
 .service-img-wrap {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
   background: var(--bg-alt);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 1px solid var(--border);
   position: relative;
+  flex-shrink: 0;
 }
 .service-img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  padding: 1.5rem;
+  object-fit: cover;
   transition: transform 0.3s ease;
 }
-.service-card:hover .service-img { transform: scale(1.05); }
+.service-card:hover .service-img { transform: scale(1.06); }
 .service-img-placeholder {
   background-image: repeating-linear-gradient(
     -45deg, transparent, transparent 8px,
-    rgba(17, 17, 16, 0.04) 8px, rgba(17, 17, 16, 0.04) 9px
+    rgba(17, 17, 16, 0.05) 8px, rgba(17, 17, 16, 0.05) 9px
   );
 }
 .service-body {
-  padding: 1.1rem 1.25rem 1.4rem;
+  background: var(--accent);
+  padding: 0.6rem 0.65rem;
+  flex-shrink: 0;
 }
 .service-title {
   font-family: var(--font-display);
-  font-size: clamp(1rem, 2vw, 1.2rem);
+  font-size: clamp(0.78rem, 1.4vw, 0.92rem);
   font-weight: 800;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--fg);
   line-height: 1.2;
+  text-align: center;
 }
-.service-desc {
-  font-size: 0.84rem;
-  font-weight: 300;
-  color: var(--fg-muted);
-  line-height: 1.65;
-  margin-top: 0.5rem;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+.service-desc { display: none; } /* visible solo en modal de detalle */
 .service-edit-btn {
   position: absolute;
   top: 0.5rem;
