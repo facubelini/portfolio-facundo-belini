@@ -903,9 +903,9 @@ button { cursor: pointer; font-family: inherit; }
 }
 .about-body { position: relative; }
 .about-bio {
-  font-size: clamp(1rem, 2vw, 1.3rem);
+  font-size: clamp(0.82rem, 1.2vw, 0.96rem);
   font-weight: 300;
-  line-height: 1.75;
+  line-height: 1.7;
   color: var(--fg);
 }
 .about-role {
