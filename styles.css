@@ -253,6 +253,9 @@ button { cursor: pointer; font-family: inherit; }
   color: var(--fg);
 }
 
+/* ── Projects section header ────────────────────────────────────── */
+.projects-header { padding-top: 4rem; }
+
 /* ── Filters ────────────────────────────────────────────────────── */
 .filters {
   padding-top: 1.5rem;
