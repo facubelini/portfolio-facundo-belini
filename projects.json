@@ -376,7 +376,9 @@
       "category": "Google Ads",
       "date": null,
       "description": "Campañas de performance",
-      "technologies": [],
+      "technologies": [
+        "Servicios profesionales"
+      ],
       "images": [
         "images/mq75djxt5poj_1781040337691_0.png"
       ]
