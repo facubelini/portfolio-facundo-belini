@@ -77,6 +77,12 @@
       "name": "Veeam",
       "category": null,
       "image": "images/brand_mwwlhh9cjzbb.jpg"
+    },
+    {
+      "id": "mwwli2jnagwj",
+      "name": "Red Hat",
+      "category": null,
+      "image": "images/brand_mwwli2jnagwj.jpg"
     }
   ]
 }
