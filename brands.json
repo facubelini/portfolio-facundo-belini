@@ -137,6 +137,12 @@
       "name": "Kaspersky",
       "category": null,
       "image": "images/brand_mwwlq0fqzwui.webp"
+    },
+    {
+      "id": "mwwlqu15p116",
+      "name": "Check Point",
+      "category": null,
+      "image": "images/brand_mwwlqu15p116.svg"
     }
   ]
 }
