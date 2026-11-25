@@ -29,6 +29,7 @@ const state = {
   certifications:   [],
   services:         [],
   tools:            [],
+  brands:           [],
   about:            { bio: '', role: '' },
   contact:          { linkedin: '', whatsapp: '', email: '' },
   hero:             { line1: 'Trabajo', line2: 'seleccionado.', sub: 'Diseño y desarrollo.' },
@@ -37,6 +38,7 @@ const state = {
   activeFilter:     'Todos',
   activeCertFilter: 'Todos',
   activeToolFilter: 'Todos',
+  activeBrandFilter: 'Todos',
   failedAttempts:   0,
   lockoutUntil:     null,
 };
@@ -1110,6 +1112,7 @@ function activateEditorMode() {
   renderServices();
   renderTools();
   renderCertifications();
+  renderBrands();
   renderContactHeader();
   renderProfileHeader();
 }
@@ -1123,6 +1126,7 @@ function deactivateEditorMode() {
   renderServices();
   renderTools();
   renderCertifications();
+  renderBrands();
   renderContactHeader();
   renderProfileHeader();
 }
@@ -2323,6 +2327,293 @@ async function deleteTool(toolId) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   MARCAS CON LAS QUE TRABAJÉ (misma mecánica que Herramientas)
+   ════════════════════════════════════════════════════════════════════ */
+
+async function loadBrands() {
+  try {
+    const res = await fetch(`./brands.json?t=${Date.now()}`);
+    if (!res.ok) throw new Error();
+    state.brands = (await res.json()).brands || [];
+  } catch { state.brands = []; }
+}
+
+function renderBrands() {
+  const section = document.getElementById('brands-section');
+  if (!section) return;
+  if (state.brands.length === 0 && !isEditorActive()) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  const addBtn = isEditorActive()
+    ? `<button class="add-cert-btn" id="add-brand-btn">
+         <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+           <line x1="5.5" y1="1" x2="5.5" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+           <line x1="1" y1="5.5" x2="10" y2="5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+         </svg>
+         Agregar
+       </button>` : '';
+
+  // Categorías únicas de marcas
+  const brandCats = ['Todos', ...new Set(state.brands.map(t => t.category).filter(Boolean))];
+  const hasCats  = brandCats.length > 1;
+
+  const brandFilterHTML = hasCats
+    ? `<div class="cert-filters" id="brand-filters-container">
+         ${brandCats.map(cat =>
+             `<button class="filter-btn brand-filter-btn${cat === state.activeBrandFilter ? ' active' : ''}" data-cat="${escHtml(cat)}">${escHtml(cat)}</button>`
+           ).join('')}
+       </div>` : '';
+
+  // Filtrar marcas
+  const filtered = state.activeBrandFilter === 'Todos'
+    ? state.brands
+    : state.brands.filter(t => t.category === state.activeBrandFilter);
+
+  const brandsHTML = filtered.length > 0
+    ? `<div class="brands-grid">${filtered.map((t, i) => buildBrandCardHTML(t, i)).join('')}</div>`
+    : `<div class="certs-empty">${state.brands.length === 0 ? 'No hay marcas todavía.' : 'No hay marcas en esta categoría.'}</div>`;
+
+  section.innerHTML = `
+    <div class="section-header">
+      <h2 class="section-title">Marcas con las que trabajé en empresas y agencias</h2>
+      ${addBtn}
+    </div>
+    ${brandFilterHTML}
+    ${brandsHTML}`;
+
+  document.getElementById('add-brand-btn')?.addEventListener('click', () => showBrandFormModal(null));
+
+  // Brand filter buttons
+  section.querySelectorAll('.brand-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.activeBrandFilter = btn.dataset.cat;
+      renderBrands();
+    });
+  });
+
+  if (isEditorActive()) {
+    section.querySelectorAll('.brand-delete-btn').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); showBrandDeleteConfirm(btn.dataset.id, btn.closest('.brand-card')); });
+    });
+    section.querySelectorAll('.brand-edit-btn').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); showBrandEditModal(btn.dataset.id); });
+    });
+  }
+}
+
+function buildBrandCardHTML(brand, idx) {
+  const id      = escHtml(brand.id || '');
+  const imgEl   = brand.image
+    ? `<img src="./${escHtml(brand.image)}" alt="${escHtml(brand.name)}" class="brand-img" loading="lazy" />`
+    : `<div class="brand-img-placeholder">${escHtml(brand.name?.[0] || '?')}</div>`;
+  const delBtn  = isEditorActive() ? `<button class="brand-delete-btn" data-id="${id}" aria-label="Eliminar" title="Eliminar">×</button>` : '';
+  const editBtn = isEditorActive()
+    ? `<button class="brand-edit-btn" data-id="${id}" aria-label="Editar" title="Editar">
+         <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+       </button>` : '';
+  const catEl = brand.category ? `<span class="brand-category">${escHtml(brand.category)}</span>` : '';
+  return `
+    <div class="brand-card" data-id="${id}" style="--card-i:${idx}">
+      ${editBtn}${delBtn}
+      <div class="brand-img-wrap">${imgEl}</div>
+      <span class="brand-name">${escHtml(brand.name)}</span>
+      ${catEl}
+    </div>`.trim();
+}
+
+function showBrandDeleteConfirm(brandId, cardEl) {
+  cardEl.querySelector('.card-confirm-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'card-confirm-overlay';
+  overlay.innerHTML = `
+    <p class="confirm-msg">¿Eliminar esta marca?</p>
+    <div class="confirm-btns">
+      <button class="btn btn-danger confirm-yes">Sí, eliminar</button>
+      <button class="btn btn-ghost confirm-no">Cancelar</button>
+    </div>`;
+  cardEl.appendChild(overlay);
+  overlay.querySelector('.confirm-no').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('.confirm-yes').addEventListener('click', () => { overlay.remove(); deleteBrand(brandId); });
+}
+
+function showBrandFormModal(existingBrand) {
+  if (!isEditorActive()) { showKeywordModal(); return; }
+  const isEdit = !!existingBrand;
+  const t = existingBrand || {};
+
+  const existingImgHTML = isEdit && t.image
+    ? `<div class="form-group">
+         <label class="form-label">Logo actual <span class="hint">(× para quitar)</span></label>
+         <div class="current-imgs" id="br-current-img">
+           <div class="current-img-item" data-img="${escHtml(t.image)}">
+             <img src="./${escHtml(t.image)}" class="current-img-thumb" alt="Logo" />
+             <button type="button" class="current-img-remove" aria-label="Quitar">×</button>
+           </div>
+         </div>
+       </div>` : '';
+
+  showModal(`
+    <div class="modal-header">
+      <h3 class="modal-title">${isEdit ? 'Editar marca' : 'Nueva marca'}</h3>
+      <button class="modal-close" onclick="hideModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="br-name">Nombre <span class="req">*</span></label>
+      <input id="br-name" type="text" class="form-input" placeholder="Figma" value="${escHtml(t.name || '')}" />
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="br-cat">Categoría <span class="hint">(opcional — sirve para filtrar)</span></label>
+      <input id="br-cat" type="text" class="form-input" placeholder="Diseño, Desarrollo, Marketing…" value="${escHtml(t.category || '')}" />
+    </div>
+    ${existingImgHTML}
+    <div class="form-group">
+      <label class="form-label" for="br-img">Logo <span class="hint">(opcional — PNG transparente recomendado)</span></label>
+      <input id="br-img" type="file" class="form-file" accept="image/*" />
+      <div class="new-imgs-preview" id="br-img-preview"></div>
+    </div>
+    <div id="br-status" class="upload-status" hidden></div>
+    <div id="br-error"  class="form-error"    hidden></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="hideModal()">Cancelar</button>
+      <button class="btn btn-primary" id="br-submit">${isEdit ? 'Guardar cambios →' : 'Agregar →'}</button>
+    </div>`);
+
+  document.querySelector('#br-current-img .current-img-remove')?.addEventListener('click', e => {
+    e.target.closest('.current-img-item').remove();
+  });
+  document.getElementById('br-img').addEventListener('change', e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('br-img-preview').innerHTML =
+        `<div class="new-img-preview-item"><img src="${ev.target.result}" class="new-img-thumb" alt="Preview" /></div>`;
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('br-submit').addEventListener('click', () => {
+    if (isEdit) submitBrandEdit(t.id, t.image || null);
+    else        submitNewBrand();
+  });
+}
+
+function showBrandEditModal(brandId) {
+  const brand = state.brands.find(t => t.id === brandId);
+  if (!brand) return;
+  showBrandFormModal(brand);
+}
+
+async function submitNewBrand() {
+  if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
+  const name     = document.getElementById('br-name').value.trim();
+  const category = document.getElementById('br-cat').value.trim();
+  const imgFile  = document.getElementById('br-img').files[0];
+  const errEl   = document.getElementById('br-error');
+  const statusEl= document.getElementById('br-status');
+  const btn     = document.getElementById('br-submit');
+
+  if (!name) { showError(errEl, 'El nombre es obligatorio.'); return; }
+  const cfg = getGHConfig(); if (!cfg) { hideModal(); showTokenModal(); return; }
+
+  btn.disabled = true; errEl.hidden = true;
+  const setStatus = (msg, type = 'loading') => { statusEl.className = `upload-status upload-status--${type}`; statusEl.textContent = msg; statusEl.hidden = false; };
+
+  const brand = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name, category: category || null, image: null,
+  };
+
+  try {
+    if (imgFile) {
+      setStatus('Subiendo logo…');
+      const base64 = await readFileAsBase64(imgFile);
+      const ext    = imgFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+      const fname  = `images/brand_${brand.id}.${ext}`;
+      await ghPutBinaryFile(fname, base64, null, `Add brand logo: ${name}`, cfg);
+      brand.image = fname;
+    }
+    setStatus('Guardando…');
+    const existing = await ghGetFile('brands.json', cfg);
+    let sha = null; let data = { brands: [] };
+    if (existing) { sha = existing.sha; data = JSON.parse(existing.content); }
+    if (!Array.isArray(data.brands)) data.brands = [];
+    data.brands.push(brand);
+    await ghPutTextFile('brands.json', JSON.stringify(data, null, 2), sha, `Add brand: ${name}`, cfg);
+    state.brands.push(brand);
+    renderBrands();
+    setStatus('¡Marca agregada!', 'success');
+    setTimeout(hideModal, 1800);
+  } catch (err) { setStatus(`Error: ${err.message}`, 'error'); btn.disabled = false; }
+}
+
+async function submitBrandEdit(brandId, originalImage) {
+  if (!isEditorActive()) { hideModal(); showKeywordModal(); return; }
+  const name     = document.getElementById('br-name').value.trim();
+  const category = document.getElementById('br-cat').value.trim();
+  const imgFile  = document.getElementById('br-img').files[0];
+  const errEl   = document.getElementById('br-error');
+  const statusEl= document.getElementById('br-status');
+  const btn     = document.getElementById('br-submit');
+
+  if (!name) { showError(errEl, 'El nombre es obligatorio.'); return; }
+  const cfg = getGHConfig(); if (!cfg) { hideModal(); showTokenModal(); return; }
+
+  const keptImage = document.querySelector('#br-current-img .current-img-item')?.dataset.img || null;
+
+  btn.disabled = true; errEl.hidden = true;
+  const setStatus = (msg, type = 'loading') => { statusEl.className = `upload-status upload-status--${type}`; statusEl.textContent = msg; statusEl.hidden = false; };
+
+  try {
+    let newImage = keptImage;
+    if (originalImage && !keptImage) {
+      try { const f = await ghGetFile(originalImage, cfg); if (f) await ghDeleteFile(originalImage, f.sha, `Remove brand logo: ${name}`, cfg); } catch {}
+    }
+    if (imgFile) {
+      setStatus('Subiendo logo…');
+      const base64 = await readFileAsBase64(imgFile);
+      const ext    = imgFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+      const fname  = `images/brand_${brandId}_${Date.now()}.${ext}`;
+      await ghPutBinaryFile(fname, base64, null, `Update brand logo: ${name}`, cfg);
+      newImage = fname;
+    }
+    setStatus('Guardando cambios…');
+    const existing = await ghGetFile('brands.json', cfg);
+    if (!existing) throw new Error('No se pudo leer brands.json');
+    const data = JSON.parse(existing.content);
+    const idx  = data.brands.findIndex(t => t.id === brandId);
+    if (idx === -1) throw new Error('Marca no encontrada');
+    const updated = { ...data.brands[idx], name, category: category || null, image: newImage };
+    data.brands[idx] = updated;
+    await ghPutTextFile('brands.json', JSON.stringify(data, null, 2), existing.sha, `Update brand: ${name}`, cfg);
+    const ti = state.brands.findIndex(t => t.id === brandId);
+    if (ti !== -1) state.brands[ti] = updated;
+    renderBrands();
+    setStatus('¡Cambios guardados!', 'success');
+    setTimeout(hideModal, 1800);
+  } catch (err) { setStatus(`Error: ${err.message}`, 'error'); btn.disabled = false; }
+}
+
+async function deleteBrand(brandId) {
+  if (!isEditorActive()) return;
+  const brand = state.brands.find(t => t.id === brandId);
+  if (!brand) return;
+  const cfg = getGHConfig(); if (!cfg) { showTokenModal(); return; }
+  const card = document.querySelector(`.brand-card[data-id="${brandId}"]`);
+  if (card) card.style.opacity = '0.35';
+  try {
+    const existing = await ghGetFile('brands.json', cfg);
+    if (!existing) throw new Error('No se pudo leer brands.json');
+    const data = JSON.parse(existing.content);
+    data.brands = (data.brands || []).filter(t => t.id !== brandId);
+    if (brand.image) {
+      try { const f = await ghGetFile(brand.image, cfg); if (f) await ghDeleteFile(brand.image, f.sha, `Remove brand logo: ${brand.name}`, cfg); } catch {}
+    }
+    await ghPutTextFile('brands.json', JSON.stringify(data, null, 2), existing.sha, `Remove brand: ${brand.name}`, cfg);
+    state.brands = state.brands.filter(t => t.id !== brandId);
+    renderBrands();
+  } catch (err) { if (card) card.style.opacity = '1'; alert(`Error al eliminar: ${err.message}`); }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    UTILIDADES
    ════════════════════════════════════════════════════════════════════ */
 
@@ -2377,7 +2668,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const yr = new Date().getFullYear();
   document.querySelectorAll('#current-year, #footer-year').forEach(el => { el.textContent = yr; });
 
-  await Promise.all([loadProjects(), loadAbout(), loadCertifications(), loadContact(), loadHero(), loadServices(), loadTools(), loadLayout(), loadProfile()]);
+  await Promise.all([loadProjects(), loadAbout(), loadCertifications(), loadContact(), loadHero(), loadServices(), loadTools(), loadBrands(), loadLayout(), loadProfile()]);
 
   renderHero();
   renderAll();
@@ -2386,6 +2677,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderServices();
   renderTools();
   renderCertifications();
+  renderBrands();
   renderContactHeader();
   renderProfileHeader();
 

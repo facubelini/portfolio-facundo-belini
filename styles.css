@@ -1722,6 +1722,127 @@ button { cursor: pointer; font-family: inherit; }
 .tool-card:hover .tool-delete-btn { opacity: 1; }
 .tool-delete-btn:hover { background: #cc2200; }
 
+/* ── Marcas ───────────────────────────────────────────────── */
+.brands-section {
+  padding-top: 4rem;
+  padding-bottom: 3rem;
+  border-bottom: 1px solid var(--border);
+}
+.brands-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.brand-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 1rem 0.85rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  position: relative;
+  min-width: 76px;
+  animation: fadeUp 0.4s ease both;
+  animation-delay: calc(var(--card-i, 0) * 25ms);
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+.brand-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(245, 197, 24, 0.18);
+}
+.brand-img-wrap {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.brand-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.brand-img-placeholder {
+  width: 44px;
+  height: 44px;
+  background: var(--bg-alt);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--fg-faint);
+  text-transform: uppercase;
+}
+.brand-name {
+  font-family: var(--font-body);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg);
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1;
+}
+.brand-edit-btn {
+  position: absolute;
+  top: -7px;
+  right: 18px;
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  color: var(--fg);
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.brand-card:hover .brand-edit-btn { opacity: 1; }
+.brand-edit-btn:hover { background: var(--accent-dark); }
+.brand-delete-btn {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  width: 18px;
+  height: 18px;
+  background: var(--fg);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.brand-card:hover .brand-delete-btn { opacity: 1; }
+.brand-delete-btn:hover { background: #cc2200; }
+
+
+/* ── Brand category badge ─────────────────────────────────────────── */
+.brand-category {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin-top: 0.2rem;
+  text-align: center;
+}
+
 /* ── Responsive ─────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .projects-grid { grid-template-columns: repeat(2, 1fr); }
