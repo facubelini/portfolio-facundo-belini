@@ -17,6 +17,12 @@
       "name": "VMWare",
       "category": null,
       "image": "images/brand_mwwl7md0ipvx.png"
+    },
+    {
+      "id": "mwwl863qv6qd",
+      "name": "Sophos",
+      "category": null,
+      "image": "images/brand_mwwl863qv6qd.webp"
     }
   ]
 }
