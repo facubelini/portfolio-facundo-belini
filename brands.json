@@ -1,1 +1,10 @@
-{"brands": []}
+{
+  "brands": [
+    {
+      "id": "mwwl3jb54unp",
+      "name": "Bind",
+      "category": null,
+      "image": "images/brand_mwwl3jb54unp.png"
+    }
+  ]
+}
